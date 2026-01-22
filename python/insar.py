@@ -12,7 +12,9 @@ class Insar:
     def velocities(self, coord):
         velocities = []
         for pt in coord:
+
             lig, col = self.raster.index(pt[0], pt[1])
+            # print("lig",lig)
             window = rasterio.windows.Window(col, lig, 1, 1)
             velocity = self.raster.read(1, window=window)[0, 0]
             velocities.append(velocity)

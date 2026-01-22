@@ -16,8 +16,10 @@ class Dip:
         points = []
         file = geopandas.read_file(self.wdir + filename)
         for pt in file.geometry:
+            # points.append([float(pt.x), float(pt.y)])
             points.append([pt.x, pt.y])
         for i in range(len(points)):
+            # points[i].append(float(mnt.elevations([points[i]])[0]))
             points[i].append(mnt.elevations([points[i]])[0])
         self.points = points
 
@@ -58,6 +60,8 @@ class Dip:
 
     def point_median(self):
         points_array = np.array(self.points)
+        # points_array = points_array.astype(float) 
+        # print("points_array[:, 0]",points_array[:, 0])
         median_x = np.median(points_array[:, 0])
         median_y = np.median(points_array[:, 1])
         self.x, self.y = median_x, median_y
