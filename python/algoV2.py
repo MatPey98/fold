@@ -26,22 +26,22 @@ n = 1000 # Echantillonnage des points le long du profil (résolution du profil)
 
 ### Profile :
 coupe = "coupe9.shp"
-chemin_coupe = "/home/geodynamique/Documents/mathieu/scripts/fold/sandbox/profile/"
+chemin_coupe = "../sandbox/profile/"
 
 ### insar :
 insar = "vertical_2014-2019_mmyr_crop03_UTM.tif"
-chemin_insar = "/home/geodynamique/Documents/mathieu/scripts/fold/sandbox/insar/"
+chemin_insar = "../sandbox/insar/"
 
 ### Mnt :
 mnt = "cop_dem30_92_101_34_40_crop_UTM_v2.tif"
-chemin_mnt = "/home/geodynamique/Documents/mathieu/scripts/fold/sandbox/dem/"
+chemin_mnt = "../sandbox/dem/"
 
 ### Pendages :
-chemin_pendages = "/home/geodynamique/Documents/mathieu/scripts/fold/sandbox/strata/profile9/"
+chemin_pendages = "../sandbox/strata/profile9/"
 
 ### Seismic :
-seismic = 'usgs03-14.csv'
-chemin_seismic = '/home/geodynamique/Documents/mathieu/scripts/fold/sandbox/seismic/'
+#seismic = 'usgs03-14.csv'
+#chemin_seismic = '../sandbox/seismic/'
 
 # ======================================================================================================================
 # Initialiser le profil et l'abscisse
@@ -109,9 +109,12 @@ plt.xlim(abscisses[0], abscisses[-1]+1000)
 # ======================================================================================================================
 # seismic
 # ======================================================================================================================
-seismic = Seismic(seismic, chemin_seismic, profile)
-abs_seismic, prof_seismic, mag = seismic.projection_seismic(width_seismic)
-seismic.print_seismic(abs_seismic, prof_seismic, mag)
+try:
+    seismic = Seismic(seismic, chemin_seismic, profile)
+    abs_seismic, prof_seismic, mag = seismic.projection_seismic(width_seismic)
+    seismic.print_seismic(abs_seismic, prof_seismic, mag)
+except:
+    print('Warning: No seimsic data')
 
 plt.show()
 # ======================================================================================================================
