@@ -1,47 +1,60 @@
+#!/usr/bin/env python3
 # -*- coding:utf-8 -*-
+
 __projet__ = "coupe_pendages_insar"
-__nom_fichier__ = "algoV2"
+__nom_fichier__ = "invert_plan.py"
 __author__ = "Mathieu Peyrache"
 __date__ = "février 2026"
 
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
+import getopt
+
 from terrain_profile import Profile
 from insar import Insar
 from mnt import MNT
 from dip import Dip
 from seismic import Seismic
 
-# ======================================================================================================================
-# Paramètres
-# ======================================================================================================================
-width = 1000 # Largeur du profil
-width_seismic = 1000
-length_dip = 500 # Longueur des traits de pendages
-n = 1000 # Echantillonnage des points le long du profil (résolution du profil)
 
-# ======================================================================================================================
-# Données
-# ======================================================================================================================
+def usage():
+  print('invert_plan.py infile.py [-h]')
+  print('-h Show this screen')
 
-### Profile :
-coupe = "coupe9.shp"
-chemin_coupe = "../sandbox/profile/"
+#load input file 
+try:
+    opts,args = getopt.getopt(sys.argv[1:], "h", ["help"])
+except:
+    print("for help use --help")
+    sys.exit()
 
-### insar :
-insar = "vertical_2014-2019_mmyr_crop03_UTM.tif"
-chemin_insar = "../sandbox/insar/"
+for o in sys.argv:
+    if o in ("-h","--help"):
+       usage()
+       sys.exit()
 
-### Mnt :
-mnt = "cop_dem30_92_101_34_40_crop_UTM_v2.tif"
-chemin_mnt = "../sandbox/dem/"
+if 1==len(sys.argv):
+  usage()
+  assert False, "no input file"
+  print('No input file')
+  sys.exit()
 
-### Pendages :
-chemin_pendages = "../sandbox/strata/profile9/"
+fname=sys.argv[1]
+exec(open(fname).read())
+if len(sys.argv)>1:
+  try:
+    fname=sys.argv[1]
+    print('Read input file {0}'.format(fname))
+    try:
+      sys.path.append(path.dirname(path.abspath(fname)))
+      exec ("from "+path.basename(fname)+" import *")
+    except:
+      exec(open(fname).read())
 
-### Seismic :
-#seismic = 'usgs03-14.csv'
-#chemin_seismic = '../sandbox/seismic/'
+  except Exception as e: 
+    print('Problem in input file')
+    sys.exit()
 
 # ======================================================================================================================
 # Initialiser le profil et l'abscisse
