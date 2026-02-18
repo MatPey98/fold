@@ -164,7 +164,11 @@ plt.show()
 
 ### export shapefile
 output_dir = "output_create_synthetic"
+output_strata_dir = os.path.join(output_dir, "strata")
+
 os.makedirs(output_dir, exist_ok=True)
+os.makedirs(output_strata_dir, exist_ok=True)
+
 crs_utm = CRS.from_epsg(32647) # epsg of the project
 
 
@@ -177,7 +181,7 @@ gdf_profile.to_file(os.path.join(output_dir, "profile.shp"))
 ### strata points
 points_strata = [Point(x,y) for x, y in zip(x_int, y_int)]
 gdf_points_strata = gpd.GeoDataFrame({"type": ["strata_points"] * len(points_strata)}, geometry=points_strata, crs = crs_utm)
-gdf_points_strata.to_file(os.path.join(output_dir, "strata_points.shp"))
+gdf_points_strata.to_file(os.path.join(output_strata_dir, "strata_points.shp"))
 
 
 ### Topo tiff
