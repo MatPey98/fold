@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
+import os
 import numpy as np
-import matplotlib.pyplot as plt
-import geopandas as gpd 
 from pyproj import CRS 
+import geopandas as gpd 
+import matplotlib.pyplot as plt
+from shapely.geometry import LineString, Point
 
 # ===========================================================
 # Parameters
@@ -11,11 +13,12 @@ from pyproj import CRS
 
 # strata
 azimuth = 0
-dip = 69
-P = ([0,0,40]) 
+dip = 20
+P = np.array([0,0,0]) 
 
 # cross section position
 x0 = 50
+# rajouter le changement d'orientation pour la coupe
 
 # lim of the model
 zmin = -100
@@ -38,6 +41,8 @@ Z_topo = 10*np.sin(X/10) + 10*np.cos(Y/10)
 # ===========================================================
 # cross section 
 # ===========================================================
+n_section = np.array([1,0,0])
+d_section = -x0
 
 Yv, Zv = np.meshgrid(y, np.linspace(-100, 40, 100)) # build surface
 Xv = np.full_like(Yv, x0)
@@ -48,7 +53,7 @@ Zv_intersect = np.where(Zv <= Z_topo_section, Zv, np.nan)
 # strata
 # ===========================================================
 
-def plan(X, Y, azimuth, dip, P):
+def plane_from_dip_azimuth(X, Y, azimuth, dip, P):
 
     azimuth_rad = np.radians(azimuth)
     dip_rad = np.radians(dip)
@@ -61,33 +66,69 @@ def plan(X, Y, azimuth, dip, P):
     Z = P[2] - (nx*(X-P[0]) + ny*(Y-P[1])) / nz
     n = np.array([nx, ny, nz])
     d = -np.dot(n, P)
-    # a = - np.tan(dip) * np.sin(az)
-    # b = - np.tan(dip) * np.cos(az)
-
-    # Z = a * X + b * Y + c
 
     return Z, n, d
 
-Z_strata, n, d = plan(X, Y, azimuth, dip, P)
+Z_strata, n_strata, d_strata = plane_from_dip_azimuth(X, Y, azimuth, dip, P)
+
+### strata limit
+Z_strata = np.where(Z_strata <= Z_topo , Z_strata, np.nan)
+Z_strata = np.where(Z_strata >= zmin, Z_strata, np.nan)
 
 # ===========================================================
 # intersection
 # ===========================================================
 
-def intersection_line(n1, d1, n2, d2):
+def intersection_plane(n1, d1, n2, d2):
+    """
+
+    n1, n2 :
+    d1, d2 :
+    return :
+    """
+
+    n1 = n1 / np.linalg.norm(n1)  # secure unit
+    n2 = n2 / np.linalg.norm(n2)
 
     direction = np.cross(n1, n2)
+    norm_dir = np.linalg.norm(direction)
+
+    if norm_dir < 1e-10:
+        return ValueError("parralel planes")
 
     A = np.vstack([n1, n2, direction])
-    B = - np.array([d1,d2, 0])
+    B = - np.array([d1, d2, 0])
 
-    point = np.linalg.solve(A, B)
+    point = np.linalg.lstsq(A, B, rcond=None)[0]
 
     return point, direction
 
-# ===========================================================
-# linspace
-# ===========================================================
+### INtersection strata / cross section
+point_line, direction_line = intersection_plane(n_strata, d_strata, n_section, d_section)
+
+t = np.linspace(-200, 200, 1000)
+x_line = point_line[0] + direction_line[0] * t
+y_line = point_line[1] + direction_line[1] * t
+z_line = point_line[2] + direction_line[2] * t
+
+z_topo_line = 10*np.sin(x_line/10) + 10*np.cos(y_line/10)
+mask_line = (z_line <= z_topo_line) & (z_line >= zmin)
+x_line = x_line[mask_line]
+y_line = y_line[mask_line]
+z_line = z_line[mask_line]
+
+### Intersection strata / topo
+z_diff = Z_strata - Z_topo
+mask_surface = np.abs(z_diff) < 0.5
+
+x_int = X[mask_surface]
+y_int = Y[mask_surface]
+z_int = Z_topo[mask_surface]
+
+### INtersection Topo / cross section
+y_profil = y
+x_profil = np.full_like(y, x0)
+z_profil = 10*np.sin(x0/10) + 10*np.cos(y/10)
 
 # ===========================================================
 # Plot 3D
@@ -96,19 +137,41 @@ def intersection_line(n1, d1, n2, d2):
 fig = plt.figure(figsize=(10,8))
 ax = fig.add_subplot(111, projection='3d')
 
-ax.plot_surface(X, Y, Z_strata)
-ax.plot_surface(Xv, Yv, Zv_intersect) 
-ax.plot_surface(X, Y, Z_topo)
+### plot surfaces
+ax.plot_surface(X, Y, Z_strata, alpha=0.5)
+ax.plot_surface(Xv, Yv, Zv, alpha=0.5) 
+ax.plot_surface(X, Y, Z_topo, alpha =0.7)
+
+### plot intersection line
+ax.plot(x_line, y_line, z_line, linewidth=2, color = 'b')
+ax.plot(x_profil, y_profil, z_profil, linewidth=2, color = 'r')
+ax.scatter(x_int, y_int, z_int, s=5, color = 'b')
 
 ax.set_xlim(0,100)
 ax.set_ylim(0,100)
-ax.set_zlim(-100,40)
+ax.set_zlim(zmin,zmax)
 
-ax.set_xlabel("X")
-ax.set_ylabel("Y (Nord)")
-ax.set_zlabel("Z")
+ax.set_xlabel("X (Est-Ouest)")
+ax.set_ylabel("Y (Nord-Sud)")
+ax.set_zlabel("Z (Profondeur)")
 plt.show()
 
 # ===========================================================
-# Create data
+# export shp data
 # ===========================================================
+### export shapefile
+output_dir = "output_create_synthetic"
+os.makedirs(output_dir, exist_ok=True)
+crs_utm = CRS.from_epsg(32647) # epsg of the project
+
+### cross section line
+line_profile = LineString(zip(x_profil, y_profil))
+gdf_profile = gpd.GeoDataFrame({"type": ["profile"]}, geometry=[line_profile], crs = crs_utm)
+gdf_profile.to_file(os.path.join(output_dir, "profile.shp"))
+
+### strata points
+points_strata = [Point(x,y) for x, y in zip(x_int, y_int)]
+gdf_points_strata = gpd.GeoDataFrame({"type": ["strata_points"] * len(points_strata)}, geometry=points_strata, crs = crs_utm)
+gdf_points_strata.to_file(os.path.join(output_dir, "strata_points.shp"))
+
+print("data exported to :", output_dir)
