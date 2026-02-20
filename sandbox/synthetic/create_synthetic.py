@@ -204,14 +204,14 @@ ax = fig.add_subplot(111, projection='3d')
 
 ### plot surfaces
 ax.plot_surface(X, Y, Z_strata, alpha=0.5) 
-ax.plot_surface(X, Y, Z_topo, alpha =0.8, cmap='terrain')
+ax.plot_surface(X, Y, Z_topo, alpha =0.8, cmap='terrain', zorder=0)
 ax.plot_surface(X_section, Y_section, Z_section, alpha = 0.5)
 
 ### plot intersection line
 ax.plot(x_line, y_line, z_line, linewidth=2, color = 'b')
 ax.plot(x_profil, y_profil, z_profil, linewidth=2, color = 'r')
 ax.scatter(x_int, y_int, z_int, s=5, color = 'b')
-ax.scatter(x_int_random, y_int_random, z_int_random, color = 'r')
+ax.scatter(x_int_random, y_int_random, z_int_random, color = 'r', zorder=10)
 
 ax.set_xlim(0,100)
 ax.set_ylim(0,100)
