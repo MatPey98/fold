@@ -22,6 +22,10 @@ P = np.array([50,50,0])
 azimuth_section = 45
 P_section = np.array([50,50,0]) # position de la coupe
 
+# noise
+sigma_xy = 5
+sigma_z = 0.5
+
 # Resolution
 resolution = 0.1
 
@@ -180,6 +184,18 @@ y_profil = y_profil[mask]
 z_profil = z_profil[mask]
 
 # ===========================================================
+# noise on strata
+# ===========================================================
+def noise(x_int, y_int, z_int, sigma_xy, sigma_z):
+    x_int_random = x_int + np.random.normal(0, sigma_xy, size=x_int.shape)
+    y_int_random = y_int + np.random.normal(0, sigma_xy, size=y_int.shape)
+    z_int_random = z_int + np.random.normal(0, sigma_z, size=z_int.shape)
+
+    return x_int_random, y_int_random, z_int_random
+
+x_int_random, y_int_random, z_int_random = noise(x_int, y_int, z_int, sigma_xy, sigma_z)
+
+# ===========================================================
 # Plot 3D
 # ===========================================================
 
@@ -188,13 +204,14 @@ ax = fig.add_subplot(111, projection='3d')
 
 ### plot surfaces
 ax.plot_surface(X, Y, Z_strata, alpha=0.5) 
-ax.plot_surface(X, Y, Z_topo, alpha =0.7)
+ax.plot_surface(X, Y, Z_topo, alpha =0.8, cmap='terrain')
 ax.plot_surface(X_section, Y_section, Z_section, alpha = 0.5)
 
 ### plot intersection line
 ax.plot(x_line, y_line, z_line, linewidth=2, color = 'b')
 ax.plot(x_profil, y_profil, z_profil, linewidth=2, color = 'r')
 ax.scatter(x_int, y_int, z_int, s=5, color = 'b')
+ax.scatter(x_int_random, y_int_random, z_int_random, color = 'r')
 
 ax.set_xlim(0,100)
 ax.set_ylim(0,100)
