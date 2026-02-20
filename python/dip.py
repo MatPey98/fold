@@ -23,18 +23,27 @@ class Dip:
 
     def load_points(self, filename, mnt):
         """
-        Charge les points pour placer le plan stratigraphique
+        Charge les points sur le mnt
         :param filename: Nom du fichier contenant les points pour le pendage
         :param mnt: Modèle d'élévation Pléiades
         :return: Les points (x, y, z)
         """
-        points = []
         file = geopandas.read_file(self.wdir + filename)
+
+        points = [] 
         for pt in file.geometry:
-            points.append([pt.x, pt.y])
+            points.append([pt.x, pt.y]) # initialise la liste points avec le nombre de points et leurs coordonnées x,y
         for i in range(len(points)):
             points[i].append(mnt.elevations([points[i]])[0])
+        
+        points_err = []
+        for pt in file.geometry:
+            points_err.append([pt.x, pt.y])
+        for i in range(len(points_err)):
+            points_err[i].append(mnt.elevations_err([points_err[i]])[0])
+
         self.points = points
+        self.points = points_err
 
     def fit_plane(self):
         """
@@ -55,12 +64,14 @@ class Dip:
         :param c:
         :return:
         """
-        points = np.array(self.points)
+        x0 = lst.lstsq(G,data)[0]
 
-        for i in range(len(points[0])):
+        _func = lambda x: np.sum(((np.dot(G,x)-data)/sigma)**2)
+        _fprime = lambda x: 2*np.dot(G.T/sigma, (np.dot(G,x)-data)/sigma)
 
-            incertitudes = sum(points[2][i] - (a * points[0][i] + b * points[1][i] - c))
-            return incertitudes
+        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+
+        return pars
 
     def calculate_dip(self, a, b, c):
         """
@@ -84,7 +95,7 @@ class Dip:
         :param a: coefficient a de l'équation de plan
         :param b: coefficient b de l'équation de plan
         """
-        azimut_rad = - math.atan2(a, b) # Valeur strike entre 0 et 90°
+        azimut_rad = math.atan2(-a, -b) # Valeur strike entre 0 et 90°
         azimut_deg = math.degrees(azimut_rad)
         if azimut_deg < 0: # Ajoute les valeurs de strike entre 270 et 360° -> complète les valeurs manquantes de strike
             azimut_deg += 360
@@ -149,7 +160,7 @@ class Dip:
             dy = length_dip * np.sin(np.radians(self.dip))
             x2 = x + dx
             y2 = y + dy
-            plt.plot([x, x2], [y, y2], "k")
+            plt.plot([x, x2], [y, y2], color='blue')
 
     def print_all(self, topodata, profile, length_dip, x0):
         """

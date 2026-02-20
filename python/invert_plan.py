@@ -68,33 +68,36 @@ x0 = abscisses[0]
 # InSAR
 # ======================================================================================================================
 ### Coupe
-plt.subplot(2, 1, 1)
 
-insar_data = Insar(insar, chemin_insar)
+try :
+  plt.subplot(2, 1, 1)
 
-band = insar_data.raster.read(1)
-rows, cols = band.shape
+  insar_data = Insar(insar, chemin_insar)
 
-abscisses_insar = []
-velocities = []
+  band = insar_data.raster.read(1)
+  rows, cols = band.shape
 
-for row in range(rows):
-    for col in range(cols):
+  abscisses_insar = []
+  velocities = []
 
-        x, y = insar_data.raster.xy(row, col)
-        proj = profile.get_projection((x, y), width)
+  for row in range(rows):
+      for col in range(cols):
 
-        if proj is not None:
+          x, y = insar_data.raster.xy(row, col)
+          proj = profile.get_projection((x, y), width)
 
-            xpp, ypp = proj
-            value = band[row, col]
+          if proj is not None:
 
-            if not np.isnan(value):
-                abscisses_insar.append(xpp)
-                velocities.append(value)
+              xpp, ypp = proj
+              value = band[row, col]
 
-plt.scatter(abscisses_insar, velocities, s=2)
+              if not np.isnan(value):
+                  abscisses_insar.append(xpp)
+                  velocities.append(value)
 
+  plt.scatter(abscisses_insar, velocities, s=2)
+except:
+    print('Warning: No insar data')
 ### Map + coupe
 
 # ======================================================================================================================
@@ -102,7 +105,7 @@ plt.scatter(abscisses_insar, velocities, s=2)
 # ======================================================================================================================
 plt.subplot(2, 1, 2)
 
-topodata = MNT(mnt, chemin_mnt)
+topodata = MNT(mnt, mnt_err, chemin_mnt)
 elevations = topodata.elevations(profile.points)
 topodata.print(abscisses, elevations)
 
