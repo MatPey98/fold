@@ -35,6 +35,3 @@ class MNT:
                 continue
             elevations_err.append(elevation)
         return elevations_err
-
-    def print(self, abs, elevations):
-        plt.plot(abs, elevations, "k")

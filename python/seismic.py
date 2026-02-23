@@ -52,15 +52,4 @@ class Seismic:
         return abscisses, depths, magnitudes
 
 
-    def print_seismic(self, abs_seismic, prof_seismic, mag):
-        plt.scatter(
-            abs_seismic,
-            -np.array(prof_seismic) * 1000,  # profondeur vers le bas
-            c=mag,
-            cmap="YlOrRd",
-            edgecolor ="k",
-            s=30
-        )
-        plt.colorbar(label="magnitude")
-
 
