@@ -18,12 +18,18 @@ class Seismic:
         """
         self.path = wdir + filename
         self.profile = profile
-        # self.data = pd.read_csv(self.path, sep=r",", header=None) # Si espace 
-        # self.data = pd.read_csv(self.path, sep=r",", header=None) # si virgule
-        self.data = pd.read_csv(self.path, sep=r"\t") # Si tabulation 
-        # self.data.columns = ["date","magnitude","x","y","depth"]
-        self.data.columns = ["date", "y", "x", "depth", "magnitude"]
-        
+        self.data = pd.read_csv(self.path, sep=r",") # si virgule
+
+        ### coordinates change :
+        transformer = Transformer.from_crs("EPSG:4326", "EPSG:32647",always_xy=True)
+
+        east, north = transformer.transform(
+            self.data["longitude"].values, 
+            self.data["latitude"].values)
+
+        self.data["longitude"] = east
+        self.data["latitude"] = north
+
 
     def projection_seismic(self, width_seismic):
 
@@ -33,7 +39,7 @@ class Seismic:
 
         for i in range(len(self.data)):
 
-            point = (self.data["x"][i], self.data["y"][i])
+            point = (self.data["longitude"][i], self.data["latitude"][i])
 
             proj = self.profile.get_projection(point, width_seismic)
 
@@ -41,7 +47,7 @@ class Seismic:
                 xpp, ypp = proj
                 abscisses.append(xpp)
                 depths.append(self.data["depth"][i])
-                magnitudes.append(self.data["magnitude"][i])
+                magnitudes.append(self.data["mag"][i])
 
         return abscisses, depths, magnitudes
 
@@ -49,8 +55,12 @@ class Seismic:
     def print_seismic(self, abs_seismic, prof_seismic, mag):
         plt.scatter(
             abs_seismic,
-            -np.array(prof_seismic),  # profondeur vers le bas
+            -np.array(prof_seismic) * 1000,  # profondeur vers le bas
             c=mag,
-            cmap="hot"
+            cmap="YlOrRd",
+            edgecolor ="k",
+            s=30
         )
+        plt.colorbar(label="magnitude")
+
 
