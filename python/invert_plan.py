@@ -108,8 +108,14 @@ elevations = topodata.elevations(profile.points)
 # ======================================================================================================================
 # strata
 # ======================================================================================================================
-directory_path = chemin_pendages
-dip = Dip(directory_path)
+directory_strata = chemin_pendages
+dip = Dip(directory_strata)
+
+# ======================================================================================================================
+# fault
+# ======================================================================================================================
+# directory_fault = chemin_fault
+# dip_fault = Dip(directory_fault)
 
 # ======================================================================================================================
 # seismic
@@ -131,7 +137,7 @@ ax1 = fig.add_subplot(gs[0])
 ax2 = fig.add_subplot(gs[1])
 
 ### Upper plot
-# InSAR
+# InSAR
 sc1 = ax1.scatter(abscisses_insar, velocities, s=2, label="InSAR vertical velocities")
 ax1.set_ylabel("Velocity")
 ax1.set_xlim(xmin, xmax)
@@ -146,6 +152,9 @@ ax2.set_ylabel("Altitude (m)")
 
 # Strata
 dip.print_all(topodata, profile, length_dip, x0)
+
+# Fault
+# dip_fault.print_all_fault(topodata, profile, length_dip_fault, x0)
 
 # Seismic
 sc2 = ax2.scatter(abs_seismic, -np.array(prof_seismic) * 1000, c=mag, cmap="YlOrRd", edgecolor="k", s=50)

@@ -14,4 +14,5 @@ chemin_pendages = wdir + "strata/"
 
 ### Mnt :
 mnt = "mnt.tif"
+mnt_err = "mnt_error.tif"
 chemin_mnt = wdir

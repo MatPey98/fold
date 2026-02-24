@@ -8,23 +8,28 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 from rasterio.transform import from_origin
 from shapely.geometry import LineString, Point
+from scipy.ndimage import gaussian_filter
 
 # ===========================================================
 # Parameters
 # ===========================================================
 
 # strata
-azimuth = 0
-dip = 70
+azimuth = 
+dip = 45
 P = np.array([50,50,0]) 
 
 # cross section position
-azimuth_section = 45
+azimuth_section = 40
 P_section = np.array([50,50,0]) # position de la coupe
 
-# noise
-sigma_xy = 5
+# noise on strata
+sigma_xy = 0.5
 sigma_z = 0.5
+
+# noise on mnt
+sigma_topo = 0.5
+correlation_lenght = 10
 
 # Resolution
 resolution = 0.1
@@ -52,6 +57,15 @@ X, Y = np.meshgrid(x,y)
 # ===========================================================
 
 Z_topo = 10*np.sin(X/10) + 10*np.cos(Y/10)
+
+# ===========================================================
+# error map on topo
+# ===========================================================
+
+noise_topo = np.random.normal(0, sigma_topo, size=Z_topo.shape)
+smooth_noise = gaussian_filter(noise_topo, sigma=correlation_lenght) # bruit spatialement corrélé
+Z_topo_noisy = Z_topo + smooth_noise
+z_topo_error = Z_topo_noisy - Z_topo
 
 # ===========================================================
 # cross section 
@@ -205,6 +219,7 @@ ax = fig.add_subplot(111, projection='3d')
 ### plot surfaces
 ax.plot_surface(X, Y, Z_strata, alpha=0.5) 
 ax.plot_surface(X, Y, Z_topo, alpha =0.8, cmap='terrain', zorder=0)
+# ax.plot_surface(X, Y, z_topo_error, alpha=0.5, cmap='seismic')
 ax.plot_surface(X_section, Y_section, Z_section, alpha = 0.5)
 
 ### plot intersection line
@@ -257,6 +272,7 @@ y_max = y.max()
 
 transform = from_origin(x_min, y_max, pixel_size, pixel_size)
 
+# mnt
 output_tif = os.path.join(output_dir, "mnt.tif")
 
 Z_topo_flipped = np.flipud(Z_topo)
@@ -273,5 +289,23 @@ with rasterio.open(
     transform=transform,
 ) as dst:
     dst.write(Z_topo_flipped, 1)
+
+# mnt error map
+output_tif_error = os.path.join(output_dir, "mnt_error.tif")
+
+Z_error_flipped = np.flipud(z_topo_error)
+
+with rasterio.open(
+    output_tif_error,
+    "w",
+    driver="GTiff",
+    height=z_topo_error.shape[0],
+    width=z_topo_error.shape[1],
+    count=1,
+    dtype=z_topo_error.dtype,
+    crs="EPSG:32647",
+    transform=transform,
+) as dst:
+    dst.write(Z_error_flipped, 1)
 
 print("data exported to :", output_dir)

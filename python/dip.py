@@ -3,6 +3,8 @@ import os
 import geopandas
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.linalg as lst
+import scipy.optimize as opt
 
 
 class Dip:
@@ -31,47 +33,54 @@ class Dip:
         file = geopandas.read_file(self.wdir + filename)
 
         points = [] 
+        sigma = []
+
         for pt in file.geometry:
-            points.append([pt.x, pt.y]) # initialise la liste points avec le nombre de points et leurs coordonnées x,y
-        for i in range(len(points)):
-            points[i].append(mnt.elevations([points[i]])[0])
-        
-        points_err = []
-        for pt in file.geometry:
-            points_err.append([pt.x, pt.y])
-        for i in range(len(points_err)):
-            points_err[i].append(mnt.elevations_err([points_err[i]])[0])
+            x, y = pt.x, pt.y
+            z = mnt.elevations([[x,y]])[0]
+            err = mnt.elevations_err([[x,y]])[0]
+
+            points.append([x,y,z])
+            sigma.append(err)
 
         self.points = points
-        self.points = points_err
+        self.sigma = sigma
 
     def fit_plane(self):
         """
         Méthode des moindres carrées afin de fitter un plan au nuage de points
         :return: les coefficients de l'équation du plan c = ax + by - z
         """
+        # points = np.array(self.points)
+        # A = np.c_[points[:, 0], points[:, 1], - np.ones(points.shape[0])]
+        # B = points[:, 2]
+        # coefficients = np.linalg.lstsq(A, B, rcond=None)[0]
+        # return coefficients
+
         points = np.array(self.points)
-        A = np.c_[points[:, 0], points[:, 1], - np.ones(points.shape[0])]
-        B = points[:, 2]
-        coefficients = np.linalg.lstsq(A, B, rcond=None)[0]
-        return coefficients
+        sigma = np.array(self.sigma)
+        # sigma = 1    
 
-    def incertitudes(self, a, b, c):
-        """
+        G = np.c_[points[:, 0], points[:, 1], - np.ones(points.shape[0])]
+        
+        data = points[:, 2]
 
-        :param a:
-        :param b:
-        :param c:
-        :return:
-        """
-        x0 = lst.lstsq(G,data)[0]
+        x0 = lst.lstsq(G, data, rcond=None)[0]
 
         _func = lambda x: np.sum(((np.dot(G,x)-data)/sigma)**2)
         _fprime = lambda x: 2*np.dot(G.T/sigma, (np.dot(G,x)-data)/sigma)
 
-        pars = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
+        coefficients = opt.fmin_slsqp(_func,x0,fprime=_fprime,iter=2000,full_output=True,iprint=0,acc=1.e-9)[0]
 
-        return pars
+        ### Covariance
+        Gw = G / sigma[:,None]
+        Cm = np.linalg.inv(Gw.T @ Gw)
+
+        self.G = G
+        self.Cm = Cm
+
+        return coefficients
+
 
     def calculate_dip(self, a, b, c):
         """
@@ -88,6 +97,7 @@ class Dip:
             theta_deg = 180 - theta_deg
         print(f'dip : {theta_deg}')
         self.dip = theta_deg
+
 
     def calculate_azimuth(self, a, b):
         """
@@ -147,9 +157,43 @@ class Dip:
             y = m1 * (x - self.x) + self.y
         self.intersect = [[x, y]]
 
+
+    def monte_carlo(self, coefficients, n=20):
+        samples = np.random.multivariate_normal(coefficients, self.Cm, n)
+        return samples 
+
+
+    def plot_uncertainties(self, samples, profile, topodata, length_dip, x0):
+        
+        original_dip = self.dip
+        original_az = self.azimuth
+
+        for a,b,c in samples:
+            self.calculate_dip(a,b,-1)
+            self.calculate_azimuth(a,b)
+            self.projeter_pendage(profile)
+            self.find_intersection(profile)
+
+            proj = profile.get_projection_all(self.intersect[0])
+            x = proj[0]
+            y = topodata.elevations(self.intersect)
+
+            if y[0] != "NaN":
+                
+                dx = length_dip * np.cos(np.radians(self.dip))
+                dy = length_dip * np.sin(np.radians(self.dip))
+
+                x2 = x + dx
+                y2 = y + dy
+                plt.plot([x, x2], [y, y2], color='red', alpha=0.15)
+        
+        self.dip = original_dip
+        self.azimuth = original_az
+
+
     def print(self, length_dip, x, y):
         """
-
+        plot strata 
         :param length_dip:
         :param x:
         :param y:
@@ -160,7 +204,8 @@ class Dip:
             dy = length_dip * np.sin(np.radians(self.dip))
             x2 = x + dx
             y2 = y + dy
-            plt.plot([x, x2], [y, y2], color='blue')
+            plt.plot([x, x2], [y, y2], color='blue', zorder=10)
+
 
     def print_all(self, topodata, profile, length_dip, x0):
         """
@@ -185,3 +230,46 @@ class Dip:
             y = topodata.elevations(self.intersect)
             if y[0] != "NaN":
                 self.print(length_dip, x, y)
+            
+            samples = self.monte_carlo([a,b,c], n=20)
+            self.plot_uncertainties(samples, profile, topodata, length_dip, x0)
+
+
+    def print_fault(self, length_dip, x, y):
+        """
+        plot fault
+        :param length_dip:
+        :param x:
+        :param y:
+        :return:
+        """
+        if self.azimuth >= 0:
+            dx = length_dip * np.cos(np.radians(self.dip))
+            dy = length_dip * np.sin(np.radians(self.dip))
+            x2 = x + dx
+            y2 = y + dy
+            plt.plot([x, x2], [y, y2], color='red')
+
+    def print_all_fault(self, topodata, profile, length_dip, x0):
+        """
+        Pour effectuer la projection des pendages
+        :param topodata:
+        :param profile:
+        :param length_dip:
+        :param x0:
+        :return:
+        """
+        for filename in self.items:
+            self.load_points(filename, topodata)
+            self.point_median()
+            a, b, c = self.fit_plane()
+            self.calculate_dip(a, b, -1)
+            self.calculate_azimuth(a, b)
+            self.projeter_pendage(profile)
+            self.find_intersection(profile)
+            #x = np.sqrt(self.intersect[0][0] ** 2 + self.intersect[0][1] ** 2) - x0
+            proj = profile.get_projection_all(self.intersect[0])
+            x = proj[0]
+            y = topodata.elevations(self.intersect)
+            if y[0] != "NaN":
+                self.print_fault(length_dip, x, y)
