@@ -88,20 +88,6 @@ class Dip:
 
         return a_samples, b_samples
 
-        # # Dip
-        # dip_samples = self.calculate_dip(a_samples, b_samples, c_samples)
-        # self.dip_samples = dip_samples
-
-        # # Azimuth
-        # azimuth_samples = self.calculate_azimuth(a_samples, b_samples)
-        # self.azimuth_samples = azimuth_samples
-
-        # # Résultats statistiques
-        # self.sigma_dip = np.std(dip_samples)
-        # self.sigma_azimuth = np.std(azimuth_samples)
-
-        # return dip_samples, azimuth_samples
-
 
     def calculate_dip(self, a, b, c):
         """
@@ -314,15 +300,73 @@ class Dip:
         for filename in self.items:
             self.load_points(filename, topodata)
             self.point_median()
-            a, b, c = self.fit_plane()
+            coefficients, sigmam = self.fit_plane()
+            a, b, c = coefficients
+            
+            # pendage moyen
             self.calculate_dip(a, b, -1)
             self.calculate_azimuth(a, b)
             self.projeter_pendage(profile)
             self.find_intersection(profile)
-            #x = np.sqrt(self.intersect[0][0] ** 2 + self.intersect[0][1] ** 2) - x0
             proj = profile.get_projection_all(self.intersect[0])
             x = proj[0]
             y = topodata.elevations(self.intersect)
             if y[0] != "NaN":
                 self.print_fault(length_dip, x, y)
+            
+            ### tout refaire pour la méthode monte carlo pour pas écraser les calculs avec self (refaire de nouvelles méthodes?)
+            a_samples, b_samples = self.propagate_uncertainties(coefficients, sigmam, n=20)
 
+            for a_i, b_i in zip(a_samples, b_samples):
+
+                # calcul sans modifier dip
+                norm = np.sqrt(a_i**2 + b_i**2 + 1)
+                dip = np.degrees(np.arccos(1 / norm))
+                if dip > 90:
+                    dip = 180 - dip
+
+                az = np.degrees(np.arctan2(-a_i, -b_i))
+                if az < 0:
+                    az += 360
+
+                # projection
+                phi = abs(profile.azimuth - az) % 360
+                if phi > 180:
+                    phi = 360 - phi
+
+                dip_rad = np.radians(dip)
+                phi_rad = np.radians(phi)
+                dip_proj = np.degrees(
+                    np.arctan(np.tan(dip_rad) * np.cos(phi_rad))
+                )
+
+                if dip_proj > 0:
+                    dip_proj = -dip_proj
+                elif dip_proj < 0:
+                    dip_proj = 180 - dip_proj
+
+                # intersection simplifiée
+                m1 = 1 / np.tan(np.radians(az + 90))
+                m2 = 1 / np.tan(np.radians(profile.azimuth))
+
+                x_int = (m1 * self.x - self.y
+                        - m2 * profile.start_point[0]
+                        + profile.start_point[1]) / (m1 - m2)
+
+                y_int = m1 * (x_int - self.x) + self.y
+
+                intersect = [[x_int, y_int]]
+
+                proj = profile.get_projection_all(intersect[0])
+                x_mc = proj[0]
+                y_mc = topodata.elevations(intersect)
+
+                if y_mc[0] != "NaN":
+
+                    dx = length_dip * np.cos(np.radians(dip_proj))
+                    dy = length_dip * np.sin(np.radians(dip_proj))
+
+                    x2 = x_mc + dx
+                    y2 = y_mc + dy
+
+                    plt.plot([x_mc, x2], [y_mc, y2], color='red', alpha=0.5)

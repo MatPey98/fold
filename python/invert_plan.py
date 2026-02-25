@@ -71,24 +71,41 @@ xmax = abscisses[-1]
 # ======================================================================================================================
 # InSAR
 # ======================================================================================================================
-
+### vertical
 try :
-  insar_data = Insar(insar, chemin_insar, profile)
-  abscisses_insar, velocities = insar_data.projection_insar(width)
+  insar_data_verti = Insar(insar_vertical, chemin_insar, profile)
+  abscisses_insar_verti, velocities_verti = insar_data_verti.projection_insar(width)
 
   # Vérifier qu’il y a bien des données projetées
-  if len(abscisses_insar) > 0:
-      bin_centers, median_vel, std_vel = insar_data.insar_statistics(width, nbins=120)
+  if len(abscisses_insar_verti) > 0:
+      bin_centers_verti, median_vel_verti, std_vel_verti = insar_data_verti.insar_statistics(width, nbins=120)
   else:
       print("Warning: No projected InSAR data")
-      abscisses_insar = np.array([])
-      velocities = np.array([])
-      bin_centers = np.array([])
-      median_vel = np.array([])
-      std_vel = np.array([])
+      abscisses_insar_verti = np.array([])
+      velocities_verti = np.array([])
+      bin_centers_verti = np.array([])
+      median_vel_verti = np.array([])
+      std_vel_verti = np.array([])
 except :
   print('Warning: No InSAR data')
 
+### shortening
+try :
+  insar_data_short = Insar(insar_shortening, chemin_insar, profile)
+  abscisses_insar_short, velocities_short = insar_data_short.projection_insar(width)
+
+  # Vérifier qu’il y a bien des données projetées
+  if len(abscisses_insar_short) > 0:
+      bin_centers_short, median_vel_short, std_vel_short = insar_data_short.insar_statistics(width, nbins=120)
+  else:
+      print("Warning: No projected InSAR data")
+      abscisses_insar_short = np.array([])
+      velocities_short = np.array([])
+      bin_centers_short = np.array([])
+      median_vel_short = np.array([])
+      std_vel_short = np.array([])
+except :
+  print('Warning: No InSAR data')
 # ======================================================================================================================
 # MNT
 # ======================================================================================================================
@@ -109,8 +126,11 @@ except:
 # ======================================================================================================================
 # fault
 # ======================================================================================================================
-# directory_fault = chemin_fault
-# dip_fault = Dip(directory_fault)
+try:
+  directory_fault = chemin_fault
+  dip_fault = Dip(directory_fault)
+except:
+  print('warning: No fault data')
 
 # ======================================================================================================================
 # seismic
@@ -133,9 +153,14 @@ ax2 = fig.add_subplot(gs[1])
 
 ### Upper plot
 # InSAR
-ax1.scatter(abscisses_insar, velocities, s=2, alpha=0.1, label="InSAR vertical velocities")
-ax1.plot(bin_centers, median_vel, color="dodgerblue", linewidth=1, alpha=0.5, label="Median")
-ax1.fill_between(bin_centers, median_vel - std_vel, median_vel + std_vel, color="dodgerblue", alpha=0.2, label="±1 std")
+ax1.scatter(abscisses_insar_verti, velocities_verti, s=2, alpha=0.1, label="InSAR vertical velocities")
+ax1.plot(bin_centers_verti, median_vel_verti, color="dodgerblue", linewidth=1, alpha=0.5, label="Median")
+ax1.fill_between(bin_centers_verti, median_vel_verti - std_vel_verti, median_vel_verti + std_vel_verti, color="dodgerblue", alpha=0.2, label="±1 std")
+
+ax1.scatter(abscisses_insar_short, velocities_short, s=2, alpha=0.1, label="InSAR vertical velocities")
+ax1.plot(bin_centers_short, median_vel_short, color="coral", linewidth=1, alpha=0.5, label="Median")
+ax1.fill_between(bin_centers_short, median_vel_short - std_vel_short, median_vel_short + std_vel_short, color="coral", alpha=0.2, label="±1 std")
+
 ax1.set_ylabel("Velocity")
 ax1.set_xlim(xmin, xmax)
 ax1.legend(loc="upper right")
@@ -151,7 +176,7 @@ ax2.set_ylabel("Altitude (m)")
 dip.print_all(topodata, profile, length_dip, x0)
 
 # Fault
-# dip_fault.print_all_fault(topodata, profile, length_dip_fault, x0)
+dip_fault.print_all_fault(topodata, profile, length_dip_fault, x0)
 
 # Seismic
 sc2 = ax2.scatter(abs_seismic, -np.array(prof_seismic) * 1000, c=mag, cmap="YlOrRd", edgecolor="k", s=50)
