@@ -71,45 +71,40 @@ xmax = abscisses[-1]
 # ======================================================================================================================
 # InSAR
 # ======================================================================================================================
+
 try :
+  insar_data = Insar(insar, chemin_insar, profile)
+  abscisses_insar, velocities = insar_data.projection_insar(width)
 
-  insar_data = Insar(insar, chemin_insar)
-
-  band = insar_data.raster.read(1)
-  rows, cols = band.shape
-
-  abscisses_insar = []
-  velocities = []
-
-  for row in range(rows):
-      for col in range(cols):
-
-          x, y = insar_data.raster.xy(row, col)
-          proj = profile.get_projection((x, y), width)
-
-          if proj is not None:
-
-              xpp, ypp = proj
-              value = band[row, col]
-
-              if not np.isnan(value):
-                  abscisses_insar.append(xpp)
-                  velocities.append(value)
-
-except:
-    print('Warning: No insar data')
+  # Vérifier qu’il y a bien des données projetées
+  if len(abscisses_insar) > 0:
+      bin_centers, median_vel, std_vel = insar_data.insar_statistics(width, nbins=120)
+  else:
+      print("Warning: No projected InSAR data")
+      abscisses_insar = np.array([])
+      velocities = np.array([])
+      bin_centers = np.array([])
+      median_vel = np.array([])
+      std_vel = np.array([])
+except :
+  print('Warning: No InSAR data')
 
 # ======================================================================================================================
 # MNT
 # ======================================================================================================================
-topodata = MNT(mnt, mnt_err, chemin_mnt)
-elevations = topodata.elevations(profile.points)
-
+try :
+  topodata = MNT(mnt, mnt_err, chemin_mnt)
+  elevations = topodata.elevations(profile.points)
+except :
+  print('Warning: No elevation data')
 # ======================================================================================================================
 # strata
 # ======================================================================================================================
-directory_strata = chemin_pendages
-dip = Dip(directory_strata)
+try :
+  directory_strata = chemin_pendages
+  dip = Dip(directory_strata)
+except:
+  print('Warning: No strata data')
 
 # ======================================================================================================================
 # fault
@@ -138,7 +133,9 @@ ax2 = fig.add_subplot(gs[1])
 
 ### Upper plot
 # InSAR
-sc1 = ax1.scatter(abscisses_insar, velocities, s=2, label="InSAR vertical velocities")
+ax1.scatter(abscisses_insar, velocities, s=2, alpha=0.1, label="InSAR vertical velocities")
+ax1.plot(bin_centers, median_vel, color="dodgerblue", linewidth=1, alpha=0.5, label="Median")
+ax1.fill_between(bin_centers, median_vel - std_vel, median_vel + std_vel, color="dodgerblue", alpha=0.2, label="±1 std")
 ax1.set_ylabel("Velocity")
 ax1.set_xlim(xmin, xmax)
 ax1.legend(loc="upper right")

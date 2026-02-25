@@ -15,7 +15,7 @@ from scipy.ndimage import gaussian_filter
 # ===========================================================
 
 # strata
-azimuth = 
+azimuth = 10 
 dip = 45
 P = np.array([50,50,0]) 
 
