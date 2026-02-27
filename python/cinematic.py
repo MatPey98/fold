@@ -5,9 +5,9 @@ def compute_fault_and_axial_surfaces(params):
     # ============================================================================
     # PARAMETRES (modifiables via le dictionnaire params)
     # ============================================================================
-    beta = np.deg2rad(params.get("beta", -45))  # Angle négatif pour un pendage nord
-    teta = np.deg2rad(params.get("teta", -20))
-    omega = np.deg2rad(params.get("omega", -5))
+    beta = np.deg2rad(params.get("beta", 45))  
+    teta = np.deg2rad(params.get("teta", 20))
+    omega = np.deg2rad(params.get("omega", 5))
     sigma = np.deg2rad(params.get("sigma", -3.2))
 
     alpha = teta + ((beta - teta) / 2)

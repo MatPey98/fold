@@ -63,7 +63,7 @@ if len(sys.argv)>1:
 # ======================================================================================================================
 profile = Profile(coupe, chemin_coupe, width) # lis la coupe à partir des pts extrèmes et son azimut
 profile.linspace(n) # Discrétise la coupe en n points en fonction de sa longueur
-abscisses = profile.abscisse #
+abscisses = np.max(profile.abscisse) - profile.abscisse #
 x0 = abscisses[0]
 xmin = abscisses[0]
 xmax = abscisses[-1]
@@ -75,10 +75,12 @@ xmax = abscisses[-1]
 try :
   insar_data_verti = Insar(insar_vertical, chemin_insar, profile)
   abscisses_insar_verti, velocities_verti = insar_data_verti.projection_insar(width)
+  abscisses_insar_verti = np.max(abscisses_insar_verti) - abscisses_insar_verti
 
   # Vérifier qu’il y a bien des données projetées
   if len(abscisses_insar_verti) > 0:
       bin_centers_verti, median_vel_verti, std_vel_verti = insar_data_verti.insar_statistics(width, nbins=120)
+      bin_centers_verti = np.max(bin_centers_verti) - bin_centers_verti
   else:
       print("Warning: No projected InSAR data")
       abscisses_insar_verti = np.array([])
@@ -93,10 +95,12 @@ except :
 try :
   insar_data_short = Insar(insar_shortening, chemin_insar, profile)
   abscisses_insar_short, velocities_short = insar_data_short.projection_insar(width)
+  abscisses_insar_short = np.max(abscisses_insar_short) - abscisses_insar_short
 
   # Vérifier qu’il y a bien des données projetées
   if len(abscisses_insar_short) > 0:
       bin_centers_short, median_vel_short, std_vel_short = insar_data_short.insar_statistics(width, nbins=120)
+      bin_centers_short = np.max(bin_centers_short) - bin_centers_short
   else:
       print("Warning: No projected InSAR data")
       abscisses_insar_short = np.array([])
@@ -138,6 +142,7 @@ except:
 try:
     seismic = Seismic(seismic, chemin_seismic, profile)
     abs_seismic, prof_seismic, mag = seismic.projection_seismic(width_seismic)
+    abs_seismic = np.max(abs_seismic) - abs_seismic
 except:
     print('Warning: No seimsic data')
 
@@ -145,22 +150,28 @@ except:
 # cinematic
 # ======================================================================================================================
 params = {
-    "pendage_direction": "sud",  # ou "sud"
     "beta": 32,  # Faille raide
+    "Ymax": 20000,  
+
     "teta": 7.5, # Deuxième segment plus plat
+    "Ymax2": 14000, 
+
     "omega": 5,  # Troisième segment presque horizontal
-    "sigma": -3.2, # Angle de cisaillement (en degrés)
+    "Ypref": 15000, 
+
+    "Ymin": -3000,  # Début du calcul de la faille
+
     "Zdec": -1307, # Profondeur de référence
     "ldec": 20000, # Longueur de référence pour le calcul des rampes. Utilisé pour le calcul des intersections entre rampes.
-    "Ypref": 5000, # Position horizontale de la faille
-    "W": 7000,     # Largeur de la première charnière
+
+    "sigma": -1, # Angle de cisaillement (en degrés)
+    
+    "W": 3000,     # Largeur de la première charnière
     "W2": 3000,    # Largeur de la deuxième charnière
-    "Ymin": -3000,  # Début du calcul de la faille
-    "Ymax": 20000,   # Fin du calcul de la faille
-    "n_strata": 20, # Nombre de strates
     "Zhaut": 1800, # Limite supérieure des surfaces axiales
-    "Ymax2": 14000, # Limite droite pour les surfaces axiales
-    "di": 2000, # Pas de discrétisation
+
+    "n_strata": 20, # Nombre de strates
+    "di": 4000, # Pas de discrétisation
     "ite_s": 1, # Nombre d'itérations
     "Y_topo": abscisses,  # Vos données topo
     "Z_topo": elevations,  # Vos données topo
@@ -168,8 +179,8 @@ params = {
     "Z_insar": velocities_verti,  # Vos données InSAR
 }
 
+results = compute_fault_and_axial_surfaces(params) # Kinematic model results
 
-results = compute_fault_and_axial_surfaces(params)
 # ======================================================================================================================
 # Plot
 # ======================================================================================================================
@@ -186,6 +197,7 @@ ax1.plot(abscisses, elevations, color="black")
 ax1.set_xlim(xmin, xmax)
 ax1.set_xlabel("Distance (m)")
 ax1.set_ylabel("Altitude (m)")
+ax1.set_ylim([3200, 4200])
 ax1.tick_params(axis='y', labelcolor='k')
 
 # InSAR
@@ -200,17 +212,17 @@ ax1b.fill_between(bin_centers_short, median_vel_short - std_vel_short, median_ve
 
 ax1b.set_ylabel("Velocity", color ='r')
 ax1b.set_xlim(xmin, xmax)
-ax1b.set_ylim(0, 20)
+ax1b.set_ylim(-5, 5)
 ax1b.legend(loc="upper right")
 
 # Cinematic
-ax1b.plot(results["Y_save"] + 9500, results["Z_save"] - 3307, '-b', label='Déformation calculée')
+ax1b.plot(results["Y_save"], results["Z_save"] - 3307, '-b', label='Déformation calculée')
 
 ### Lower plot
 # Topo
 ax2.plot(abscisses, elevations, color="black")
-ax2.set_xlabel("Distance (m)")
-ax2.set_ylabel("Altitude (m)")
+ax2.set_xlabel('Distance horizontale (m)')
+ax2.set_ylabel('Profondeur (m)')
 
 # Strata
 dip.print_all(topodata, profile, length_dip, x0)
@@ -226,12 +238,10 @@ cbar.set_label("Magnitude")
 
 # Cinematic
 ax2.plot(results["Yfaille"], results["Zfaille"], '-r', label='Faille')
-ax2.plot(results["Y_topo"], results["Z_topo"], '-k', label='Topo')
-ax2.set_xlabel('Distance horizontale (m)')
-ax2.set_ylabel('Profondeur (m)')
-ax2.axis('equal')
+ax2.legend(loc="upper right")
 ax2.grid(True)
 ax2.legend()
-ax2.set_xlim([-5, 5])
+
+ax2.set_xlim([xmin, xmax])
 
 plt.show()
