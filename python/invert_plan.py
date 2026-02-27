@@ -18,7 +18,7 @@ from insar import Insar
 from mnt import MNT
 from dip import Dip
 from seismic import Seismic
-
+from cinematic import compute_fault_and_axial_surfaces
 
 def usage():
   print('invert_plan.py infile.py [-h]')
@@ -142,6 +142,35 @@ except:
     print('Warning: No seimsic data')
 
 # ======================================================================================================================
+# cinematic
+# ======================================================================================================================
+params = {
+    "pendage_direction": "sud",  # ou "sud"
+    "beta": 32,  # Faille raide
+    "teta": 7.5, # Deuxième segment plus plat
+    "omega": 5,  # Troisième segment presque horizontal
+    "sigma": -3.2, # Angle de cisaillement (en degrés)
+    "Zdec": -1307, # Profondeur de référence
+    "ldec": 20000, # Longueur de référence pour le calcul des rampes. Utilisé pour le calcul des intersections entre rampes.
+    "Ypref": 5000, # Position horizontale de la faille
+    "W": 7000,     # Largeur de la première charnière
+    "W2": 3000,    # Largeur de la deuxième charnière
+    "Ymin": -3000,  # Début du calcul de la faille
+    "Ymax": 20000,   # Fin du calcul de la faille
+    "n_strata": 20, # Nombre de strates
+    "Zhaut": 1800, # Limite supérieure des surfaces axiales
+    "Ymax2": 14000, # Limite droite pour les surfaces axiales
+    "di": 2000, # Pas de discrétisation
+    "ite_s": 1, # Nombre d'itérations
+    "Y_topo": abscisses,  # Vos données topo
+    "Z_topo": elevations,  # Vos données topo
+    "Y_insar": abscisses_insar_verti,  # Vos données InSAR
+    "Z_insar": velocities_verti,  # Vos données InSAR
+}
+
+
+results = compute_fault_and_axial_surfaces(params)
+# ======================================================================================================================
 # Plot
 # ======================================================================================================================
 
@@ -152,23 +181,34 @@ ax1 = fig.add_subplot(gs[0])
 ax2 = fig.add_subplot(gs[1])
 
 ### Upper plot
-# InSAR
-ax1.scatter(abscisses_insar_verti, velocities_verti, s=2, alpha=0.1, label="InSAR vertical velocities")
-ax1.plot(bin_centers_verti, median_vel_verti, color="dodgerblue", linewidth=1, alpha=0.5, label="Median")
-ax1.fill_between(bin_centers_verti, median_vel_verti - std_vel_verti, median_vel_verti + std_vel_verti, color="dodgerblue", alpha=0.2, label="±1 std")
-
-ax1.scatter(abscisses_insar_short, velocities_short, s=2, alpha=0.1, label="InSAR vertical velocities")
-ax1.plot(bin_centers_short, median_vel_short, color="coral", linewidth=1, alpha=0.5, label="Median")
-ax1.fill_between(bin_centers_short, median_vel_short - std_vel_short, median_vel_short + std_vel_short, color="coral", alpha=0.2, label="±1 std")
-
-ax1.set_ylabel("Velocity")
+# Topo
+ax1.plot(abscisses, elevations, color="black")
 ax1.set_xlim(xmin, xmax)
-ax1.legend(loc="upper right")
+ax1.set_xlabel("Distance (m)")
+ax1.set_ylabel("Altitude (m)")
+ax1.tick_params(axis='y', labelcolor='k')
+
+# InSAR
+ax1b = ax1.twinx()
+ax1b.scatter(abscisses_insar_verti, velocities_verti, s=2, alpha=0.1, label="InSAR vertical velocities")
+ax1b.plot(bin_centers_verti, median_vel_verti, color="dodgerblue", linewidth=1, alpha=0.5, label="Median")
+ax1b.fill_between(bin_centers_verti, median_vel_verti - std_vel_verti, median_vel_verti + std_vel_verti, color="dodgerblue", alpha=0.2, label="±1 std")
+
+ax1b.scatter(abscisses_insar_short, velocities_short, s=2, alpha=0.1, label="InSAR vertical velocities")
+ax1b.plot(bin_centers_short, median_vel_short, color="coral", linewidth=1, alpha=0.5, label="Median")
+ax1b.fill_between(bin_centers_short, median_vel_short - std_vel_short, median_vel_short + std_vel_short, color="coral", alpha=0.2, label="±1 std")
+
+ax1b.set_ylabel("Velocity", color ='r')
+ax1b.set_xlim(xmin, xmax)
+ax1b.set_ylim(0, 20)
+ax1b.legend(loc="upper right")
+
+# Cinematic
+ax1b.plot(results["Y_save"] + 9500, results["Z_save"] - 3307, '-b', label='Déformation calculée')
 
 ### Lower plot
 # Topo
 ax2.plot(abscisses, elevations, color="black")
-ax2.set_xlim(xmin, xmax)
 ax2.set_xlabel("Distance (m)")
 ax2.set_ylabel("Altitude (m)")
 
@@ -183,5 +223,15 @@ sc2 = ax2.scatter(abs_seismic, -np.array(prof_seismic) * 1000, c=mag, cmap="YlOr
 cax = inset_axes(ax2, width="3%", height="30%", loc="lower left", borderpad=1)
 cbar = fig.colorbar(sc2, cax=cax)
 cbar.set_label("Magnitude")
+
+# Cinematic
+ax2.plot(results["Yfaille"], results["Zfaille"], '-r', label='Faille')
+ax2.plot(results["Y_topo"], results["Z_topo"], '-k', label='Topo')
+ax2.set_xlabel('Distance horizontale (m)')
+ax2.set_ylabel('Profondeur (m)')
+ax2.axis('equal')
+ax2.grid(True)
+ax2.legend()
+ax2.set_xlim([-5, 5])
 
 plt.show()
