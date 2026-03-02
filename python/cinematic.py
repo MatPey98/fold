@@ -161,8 +161,8 @@ def compute_fault_and_axial_surfaces(params):
     # ============================================================================
     # DEFOMRATION DES STRATES (logique MATLAB reproduite)
     # ============================================================================
-    Smax = 30
-    n_tot = 1
+    Smax = params.get("Smax", 30)
+    n_tot = params.get("n_tot", 1)
     deltaS = Smax / n_tot
 
     # Utilisation des données topo et InSAR passées en paramètres
@@ -396,4 +396,6 @@ def compute_fault_and_axial_surfaces(params):
         "Z_topo": Z_topo,
         "Y_insar": Y_insar,
         "Z_insar": Z_insar,
+        "Smax": Smax,
+        "n_tot": n_tot
     }

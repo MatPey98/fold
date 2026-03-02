@@ -169,7 +169,7 @@ class Dip:
 # Plot strata
 # ======================================================================================================================
 
-    def print(self, length_dip, x, y):
+    def print(self, length_dip, x, y, ax):
         """
         plot strata 
         :param length_dip:
@@ -180,12 +180,12 @@ class Dip:
         if self.azimuth >= 0:
             dx = length_dip * np.cos(np.radians(self.dip))
             dy = length_dip * np.sin(np.radians(self.dip))
-            x2 = x + dx
+            x2 = x - dx
             y2 = y + dy
-            plt.plot([x, x2], [y, y2], color='blue', zorder=10)
+            ax.plot([x, x2], [y, y2], color='blue', zorder=10)
 
 
-    def print_all(self, topodata, profile, length_dip, x0):
+    def print_all(self, topodata, profile, length_dip, ax):
         """
         Pour effectuer la projection des pendages
         :param topodata:
@@ -206,10 +206,10 @@ class Dip:
             self.projeter_pendage(profile)
             self.find_intersection(profile)
             proj = profile.get_projection_all(self.intersect[0])
-            x = proj[0]
+            x = np.max(profile.abscisse) - proj[0]
             y = topodata.elevations(self.intersect)
             if y[0] != "NaN":
-                self.print(length_dip, x, y)
+                self.print(length_dip, x, y, ax)
             
             ### tout refaire pour la méthode monte carlo pour pas écraser les calculs avec self (refaire de nouvelles méthodes?)
             a_samples, b_samples = self.propagate_uncertainties(coefficients, sigmam, n=20)
@@ -255,7 +255,7 @@ class Dip:
                 intersect = [[x_int, y_int]]
 
                 proj = profile.get_projection_all(intersect[0])
-                x_mc = proj[0]
+                x_mc = np.max(profile.abscisse) - proj[0]
                 y_mc = topodata.elevations(intersect)
 
                 if y_mc[0] != "NaN":
@@ -263,16 +263,16 @@ class Dip:
                     dx = length_dip * np.cos(np.radians(dip_proj))
                     dy = length_dip * np.sin(np.radians(dip_proj))
 
-                    x2 = x_mc + dx
+                    x2 = x_mc - dx
                     y2 = y_mc + dy
 
-                    plt.plot([x_mc, x2], [y_mc, y2], color='lightblue', alpha=0.5)
+                    ax.plot([x_mc, x2], [y_mc, y2], color='lightblue', alpha=0.5)
 
 # ======================================================================================================================
 # Plot fault
 # ======================================================================================================================
 
-    def print_fault(self, length_dip, x, y):
+    def print_fault(self, length_dip, x, y, ax):
         """
         plot fault
         :param length_dip:
@@ -283,12 +283,12 @@ class Dip:
         if self.azimuth >= 0:
             dx = length_dip * np.cos(np.radians(self.dip))
             dy = length_dip * np.sin(np.radians(self.dip))
-            x2 = x + dx
+            x2 = x - dx
             y2 = y + dy
-            plt.plot([x, x2], [y, y2], color='red')
+            ax.plot([x, x2], [y, y2], color='red')
 
 
-    def print_all_fault(self, topodata, profile, length_dip, x0):
+    def print_all_fault(self, topodata, profile, length_dip, ax):
         """
         Pour effectuer la projection des pendages
         :param topodata:
@@ -309,10 +309,10 @@ class Dip:
             self.projeter_pendage(profile)
             self.find_intersection(profile)
             proj = profile.get_projection_all(self.intersect[0])
-            x = proj[0]
+            x = np.max(profile.abscisse) - proj[0]
             y = topodata.elevations(self.intersect)
             if y[0] != "NaN":
-                self.print_fault(length_dip, x, y)
+                self.print_fault(length_dip, x, y, ax)
             
             ### tout refaire pour la méthode monte carlo pour pas écraser les calculs avec self (refaire de nouvelles méthodes?)
             a_samples, b_samples = self.propagate_uncertainties(coefficients, sigmam, n=20)
@@ -358,7 +358,7 @@ class Dip:
                 intersect = [[x_int, y_int]]
 
                 proj = profile.get_projection_all(intersect[0])
-                x_mc = proj[0]
+                x_mc = np.max(profile.abscisse) - proj[0]
                 y_mc = topodata.elevations(intersect)
 
                 if y_mc[0] != "NaN":
@@ -366,7 +366,7 @@ class Dip:
                     dx = length_dip * np.cos(np.radians(dip_proj))
                     dy = length_dip * np.sin(np.radians(dip_proj))
 
-                    x2 = x_mc + dx
+                    x2 = x_mc - dx
                     y2 = y_mc + dy
 
-                    plt.plot([x_mc, x2], [y_mc, y2], color='red', alpha=0.5)
+                    ax.plot([x_mc, x2], [y_mc, y2], color='red', alpha=0.5)

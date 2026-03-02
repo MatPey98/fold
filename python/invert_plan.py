@@ -9,6 +9,7 @@ __date__ = "février 2026"
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
+import os
 import getopt
 import matplotlib.gridspec as gridspec
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
@@ -157,7 +158,7 @@ params = {
     "Ymax2": 14000, 
 
     "omega": 5,  # Troisième segment presque horizontal
-    "Ypref": 15000, 
+    "Ypref": 5000, 
 
     "Ymin": -3000,  # Début du calcul de la faille
 
@@ -166,7 +167,7 @@ params = {
 
     "sigma": -1, # Angle de cisaillement (en degrés)
     
-    "W": 3000,     # Largeur de la première charnière
+    "W": 7000,     # Largeur de la première charnière
     "W2": 3000,    # Largeur de la deuxième charnière
     "Zhaut": 1800, # Limite supérieure des surfaces axiales
 
@@ -177,6 +178,8 @@ params = {
     "Z_topo": elevations,  # Vos données topo
     "Y_insar": abscisses_insar_verti,  # Vos données InSAR
     "Z_insar": velocities_verti,  # Vos données InSAR
+    "Smax": 2.5, # raccourcissement
+    "n_tot": 1
 }
 
 results = compute_fault_and_axial_surfaces(params) # Kinematic model results
@@ -212,11 +215,11 @@ ax1b.fill_between(bin_centers_short, median_vel_short - std_vel_short, median_ve
 
 ax1b.set_ylabel("Velocity", color ='r')
 ax1b.set_xlim(xmin, xmax)
-ax1b.set_ylim(-5, 5)
+ax1b.set_ylim(-6, 6)
 ax1b.legend(loc="upper right")
 
 # Cinematic
-ax1b.plot(results["Y_save"], results["Z_save"] - 3307, '-b', label='Déformation calculée')
+ax1b.plot(results["Y_save"] - 1640, results["Z_save"] - 3307, '-b', label='Déformation calculée')
 
 ### Lower plot
 # Topo
@@ -225,10 +228,10 @@ ax2.set_xlabel('Distance horizontale (m)')
 ax2.set_ylabel('Profondeur (m)')
 
 # Strata
-dip.print_all(topodata, profile, length_dip, x0)
+dip.print_all(topodata, profile, length_dip, ax2)
 
 # Fault
-dip_fault.print_all_fault(topodata, profile, length_dip_fault, x0)
+dip_fault.print_all_fault(topodata, profile, length_dip_fault, ax2)
 
 # Seismic
 sc2 = ax2.scatter(abs_seismic, -np.array(prof_seismic) * 1000, c=mag, cmap="YlOrRd", edgecolor="k", s=50)
@@ -237,11 +240,24 @@ cbar = fig.colorbar(sc2, cax=cax)
 cbar.set_label("Magnitude")
 
 # Cinematic
-ax2.plot(results["Yfaille"], results["Zfaille"], '-r', label='Faille')
+ax2.plot(results["Yfaille"] - 1640, results["Zfaille"], '-r', label='Faille')
 ax2.legend(loc="upper right")
 ax2.grid(True)
 ax2.legend()
 
 ax2.set_xlim([xmin, xmax])
+
+# ======================================================================================================================
+# Save figure
+# ======================================================================================================================
+output_dir = "/data/scratch/mathieu/qaidam/output_fold_qaidam/"
+
+os.makedirs(output_dir, exist_ok=True)
+
+output_path = os.path.join(output_dir,"coupe3_figure1.png")
+
+plt.savefig(output_path, dpi=300, bbox_inches='tight')
+
+print(f'figure sauvegardé dans : {output_path}')
 
 plt.show()
