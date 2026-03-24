@@ -21,9 +21,6 @@ from dip import Dip
 from seismic import Seismic
 from cinematic import compute_fault_and_axial_surfaces
 
-import pandas as pd
-from pyproj import Transformer
-
 def usage():
   print('invert_plan.py infile.py [-h]')
   print('-h Show this screen')
@@ -58,7 +55,7 @@ if len(sys.argv)>1:
     except:
       exec(open(fname).read())
 
-  except Exception as e: 
+  except Exception as e:
     print('Problem in input file')
     sys.exit()
 
@@ -85,7 +82,13 @@ try :
   if len(abscisses_insar_verti) > 0:
       bin_centers_verti, median_vel_verti, std_vel_verti = insar_data_verti.insar_statistics(width, nbins=120)
       bin_centers_verti = np.max(bin_centers_verti) - bin_centers_verti
-
+  else:
+      print("Warning: No projected InSAR data")
+      abscisses_insar_verti = np.array([])
+      velocities_verti = np.array([])
+      bin_centers_verti = np.array([])
+      median_vel_verti = np.array([])
+      std_vel_verti = np.array([])
 except :
   print('Warning: No InSAR data')
 
@@ -99,7 +102,13 @@ try :
   if len(abscisses_insar_short) > 0:
       bin_centers_short, median_vel_short, std_vel_short = insar_data_short.insar_statistics(width, nbins=120)
       bin_centers_short = np.max(bin_centers_short) - bin_centers_short
-
+  else:
+      print("Warning: No projected InSAR data")
+      abscisses_insar_short = np.array([])
+      velocities_short = np.array([])
+      bin_centers_short = np.array([])
+      median_vel_short = np.array([])
+      std_vel_short = np.array([])
 except :
   print('Warning: No InSAR data')
 # ======================================================================================================================
@@ -133,79 +142,43 @@ except:
 # ======================================================================================================================
 try:
     seismic = Seismic(seismic, chemin_seismic, profile)
-    abs_seismic, prof_seismic, mag, rms_values = seismic.projection_seismic(width_seismic)
+    abs_seismic, prof_seismic, mag = seismic.projection_seismic(width_seismic)
     abs_seismic = np.max(abs_seismic) - abs_seismic
 except:
     print('Warning: No seimsic data')
 
 # ======================================================================================================================
-# Chinese seismic catalog
-# ======================================================================================================================
-catalog_file = '/data/scratch/mathieu/qaidam/data/seismic/chinease_catalog_strip.txt'
-try:
-    data = pd.read_csv(catalog_file, sep=r"\s+", header=None,
-                       names=["date", "mag", "longitude", "latitude", "depth"],
-                       parse_dates=["date"])
-    # Projection des coordonnées
-    transformer = Transformer.from_crs("EPSG:4326", "EPSG:32647", always_xy=True)
-    east, north = transformer.transform(data["longitude"].values, data["latitude"].values)
-    data["east"] = east
-    data["north"] = north
-
-    # Projection sur le profil
-    abscisses_catalog = []
-    depths_catalog = []
-    magnitudes_catalog = []
-    for i in range(len(data)):
-        point = (data["east"][i], data["north"][i])
-        proj = profile.get_projection(point, width_seismic)
-        if proj is not None:
-            xpp, ypp = proj
-            abscisses_catalog.append(xpp)
-            depths_catalog.append(data["depth"][i])
-            magnitudes_catalog.append(data["mag"][i])
-
-    abscisses_catalog = np.max(abscisses_catalog) - np.array(abscisses_catalog)
-    depths_catalog = np.array(depths_catalog)
-    magnitudes_catalog = np.array(magnitudes_catalog)
-except Exception as e:
-    print(f"Warning: Could not load or project Chinese seismic data: {e}")
-
-# ======================================================================================================================
 # cinematic
 # ======================================================================================================================
 params = {
-  # 1ere rampe
-    "beta": 65,  
-    "Y_faille": 18440,
-    "Z_faille": 3400,
+    "beta": 32,  # Faille raide
+    "Ymax": 20000,  
 
-  # 2ème rampe
-    "teta": 50,
-    "Y_r2": 18000,
+    "teta": 7.5, # Deuxième segment plus plat
+    "Ymax2": 14000, 
 
-  # 3ème rampe
-    "omega": 30,  # Troisième segment presque horizontal
-    "Y_r3": 7000,
+    "omega": 5,  # Troisième segment presque horizontal
+    "Ypref": 5000, 
 
-  # ZOne d'étude
     "Ymin": -3000,  # Début du calcul de la faille
-    "Ymax": 18440,
 
-  # Largeur des charnières
-    "W": 5000,     # Largeur de la première charnière
-    "W2": 5000,    # Largeur de la deuxième charnière
+    "Zdec": -1307, # Profondeur de référence
+    "ldec": 20000, # Longueur de référence pour le calcul des rampes. Utilisé pour le calcul des intersections entre rampes.
+
+    "sigma": -1, # Angle de cisaillement (en degrés)
     
-    "Zhaut": 1800, 
-    "n_strata": 20, # Nombre de strates
-    "di": 2000, # Pas de discrétisation
-    "ite_s": 1, # Nombre d'itérations
+    "W": 7000,     # Largeur de la première charnière
+    "W2": 3000,    # Largeur de la deuxième charnière
+    "Zhaut": 1500, # Limite supérieure des surfaces axiales
 
+    "n_strata": 20, # Nombre de strates
+    "di": 4000, # Pas de discrétisation
+    "ite_s": 1, # Nombre d'itérations
     "Y_topo": abscisses,  # Vos données topo
     "Z_topo": elevations,  # Vos données topo
-    
-    "Ymax2":14000,
-    "Smax": 30, # raccourcissement
+    # "Y_insar": abscisses_insar_verti,  # Vos données InSAR
+    # "Z_insar": velocities_verti,  # Vos données InSAR
+    "Smax": 1, # raccourcissement
     "n_tot": 1
 }
 
@@ -225,6 +198,7 @@ ax2 = fig.add_subplot(gs[1])
 # Topo
 ax1.plot(abscisses, elevations, color="black")
 ax1.set_xlim(xmin, xmax)
+ax1.set_xlabel("Distance (m)")
 ax1.set_ylabel("Altitude (m)")
 ax1.set_ylim([3200, 4200])
 ax1.tick_params(axis='y', labelcolor='k')
@@ -241,11 +215,11 @@ ax1b.fill_between(bin_centers_short, median_vel_short - std_vel_short, median_ve
 
 ax1b.set_ylabel("Velocity", color ='r')
 ax1b.set_xlim(xmin, xmax)
-ax1b.set_ylim(-120, 200)
+ax1b.set_ylim(-6, 6)
 ax1b.legend(loc="upper right")
 
 # Cinematic
-ax1b.plot(results["Y_save"], results["Z_save"] - 3307, '-b', label='Déformation calculée')
+ax1b.plot(results["Y_save"] - 1640, results["Z_save"] - 3307, '-b', label='Déformation calculée')
 
 ### Lower plot
 # Topo
@@ -260,23 +234,17 @@ dip.print_all(topodata, profile, length_dip, ax2)
 # dip_fault.print_all_fault(topodata, profile, length_dip_fault, ax2)
 
 # Seismic
-sc2 = ax2.scatter(abs_seismic, -np.array(prof_seismic) * 1000 + 3600, c=mag, cmap="YlOrRd", edgecolor="k", s=50)
-ax2.errorbar(abs_seismic, -np.array(prof_seismic) * 1000 + 3600, xerr=rms_values, yerr=rms_values, fmt='none', ecolor='k', capsize=3)
+sc2 = ax2.scatter(abs_seismic, -np.array(prof_seismic) * 1000, c=mag, cmap="YlOrRd", edgecolor="k", s=50)
 cax = inset_axes(ax2, width="3%", height="30%", loc="lower left", borderpad=1)
-# Chinese catalog
-if len(abscisses_catalog) > 0:
-    sc_catalog = ax2.scatter(abscisses_catalog, -np.array(depths_catalog) * 1000 + 3600, c=magnitudes_catalog, cmap="YlOrRd", edgecolor="k", s=50, label="Catalogue chinois")
 cbar = fig.colorbar(sc2, cax=cax)
 cbar.set_label("Magnitude")
 
 # Cinematic
-ax2.plot(results["Yfaille"], results["Zfaille"], '-r', label='Faille')
-ax2.plot(results["Y_asurf1"], results["Z_asurf1"], '-k', alpha=0.5, label='surface axiale 1')
-ax2.plot(results["Y_asurf2"], results["Z_asurf2"], '-k', alpha=0.5, label='surface axiale 2')
-ax2.plot(results["Y_asurf3"], results["Z_asurf3"], '-k', alpha=0.5, label='surface axiale 3')
-ax2.plot(results["Y_asurf4"], results["Z_asurf4"], '-k', alpha=0.5, label='surface axiale 4')
-ax2.plot(results["Y_r2"], results["Z_r2"], 'or', label="Point d'intersection R2")
-ax2.plot(results["Y_r3"], results["Z_r3"], 'or', label="Point d'intersection R3")
+ax2.plot(results["Yfaille"] - 1640, results["Zfaille"], '-r', label='Faille')
+ax2.plot(results["Y_asurf1"] - 1640, results["Z_asurf1"], '-k', alpha=0.5, label='surface axiale 1')
+ax2.plot(results["Y_asurf2"] - 1640, results["Z_asurf2"], '-k', alpha=0.5, label='surface axiale 2')
+ax2.plot(results["Y_asurf3"] - 1640, results["Z_asurf3"], '-k', alpha=0.5, label='surface axiale 3')
+ax2.plot(results["Y_asurf4"] - 1640, results["Z_asurf4"], '-k', alpha=0.5, label='surface axiale 4')
 # ax2.legend(loc="upper right")
 ax2.grid(True)
 # ax2.legend()

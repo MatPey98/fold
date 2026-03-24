@@ -36,6 +36,7 @@ class Seismic:
         abscisses = []
         depths = []
         magnitudes = []
+        rms = []
 
         for i in range(len(self.data)):
 
@@ -48,8 +49,9 @@ class Seismic:
                 abscisses.append(xpp)
                 depths.append(self.data["depth"][i])
                 magnitudes.append(self.data["mag"][i])
+                rms.append(self.data["rms"][i]*1000)
 
-        return abscisses, depths, magnitudes
+        return abscisses, depths, magnitudes, rms
 
 
 

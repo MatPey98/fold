@@ -50,7 +50,7 @@ class Insar:
         bin_centers = []
         median_vel = []
         std_vel = []
-
+        
         for i in range(1, len(bins)):
             mask = digitized == i
             if np.any(mask):
