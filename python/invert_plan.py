@@ -1,34 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 
-__projet__ = "coupe_pendages_insar"
-__nom_fichier__ = "invert_plan.py"
-__author__ = "Mathieu Peyrache"
-__date__ = "février 2026"
-
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
-import os
+from os import path
 import getopt
 import matplotlib.gridspec as gridspec
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
-from terrain_profile import Profile
-from insar import Insar
-from mnt import MNT
+from profile import Profile
+from read_data import Insar, MNT, Seismic
 from dip import Dip
-from seismic import Seismic
-from cinematic import compute_fault_and_axial_surfaces
 
-import pandas as pd
-from pyproj import Transformer
+# ======================================================================================================================
+# Donnée entrée
+# ======================================================================================================================
 
 def usage():
   print('invert_plan.py infile.py [-h]')
   print('-h Show this screen')
 
-#load input file 
+#load input file
 try:
     opts,args = getopt.getopt(sys.argv[1:], "h", ["help"])
 except:
@@ -58,16 +51,16 @@ if len(sys.argv)>1:
     except:
       exec(open(fname).read())
 
-  except Exception as e: 
+  except Exception as e:
     print('Problem in input file')
     sys.exit()
 
 # ======================================================================================================================
 # Initialiser le profil et l'abscisse
 # ======================================================================================================================
-profile = Profile(coupe, chemin_coupe, width) # lis la coupe à partir des pts extrèmes et son azimut
-profile.linspace(n) # Discrétise la coupe en n points en fonction de sa longueur
-abscisses = np.max(profile.abscisse) - profile.abscisse #
+profile = Profile(coupe, chemin_coupe, width)  # lis la coupe à partir des pts extrèmes et son azimut
+profile.linspace(n)  # Discrétise la coupe en n points en fonction de sa longueur
+abscisses = np.max(profile.abscisse) - profile.abscisse  #
 x0 = abscisses[0]
 xmin = abscisses[0]
 xmax = abscisses[-1]
@@ -76,57 +69,59 @@ xmax = abscisses[-1]
 # InSAR
 # ======================================================================================================================
 ### vertical
-try :
-  insar_data_verti = Insar(insar_vertical, chemin_insar, profile)
-  abscisses_insar_verti, velocities_verti = insar_data_verti.projection_insar(width)
-  abscisses_insar_verti = np.max(abscisses_insar_verti) - abscisses_insar_verti
+try:
+    insar_data_verti = Insar(insar_vertical, chemin_insar, profile)
+    abscisses_insar_verti, velocities_verti = insar_data_verti.projection_insar(width)
+    abscisses_insar_verti = np.max(abscisses_insar_verti) - abscisses_insar_verti
 
-  # Vérifier qu’il y a bien des données projetées
-  if len(abscisses_insar_verti) > 0:
-      bin_centers_verti, median_vel_verti, std_vel_verti = insar_data_verti.insar_statistics(width, nbins=120)
-      bin_centers_verti = np.max(bin_centers_verti) - bin_centers_verti
-
-except :
-  print('Warning: No InSAR data')
+    # Vérifier qu’il y a bien des données projetées
+    if len(abscisses_insar_verti) > 0:
+        bin_centers_verti, median_vel_verti, std_vel_verti = insar_data_verti.insar_statistics(width, nbins=120)
+        bin_centers_verti = np.max(bin_centers_verti) - bin_centers_verti
+    else:
+        print("Warning: No projected InSAR data")
+except:
+    print('Warning: No InSAR data')
 
 ### shortening
-try :
-  insar_data_short = Insar(insar_shortening, chemin_insar, profile)
-  abscisses_insar_short, velocities_short = insar_data_short.projection_insar(width)
-  abscisses_insar_short = np.max(abscisses_insar_short) - abscisses_insar_short
+try:
+    insar_data_short = Insar(insar_shortening, chemin_insar, profile)
+    abscisses_insar_short, velocities_short = insar_data_short.projection_insar(width)
+    abscisses_insar_short = np.max(abscisses_insar_short) - abscisses_insar_short
 
-  # Vérifier qu’il y a bien des données projetées
-  if len(abscisses_insar_short) > 0:
-      bin_centers_short, median_vel_short, std_vel_short = insar_data_short.insar_statistics(width, nbins=120)
-      bin_centers_short = np.max(bin_centers_short) - bin_centers_short
-
-except :
-  print('Warning: No InSAR data')
+    # Vérifier qu’il y a bien des données projetées
+    if len(abscisses_insar_short) > 0:
+        bin_centers_short, median_vel_short, std_vel_short = insar_data_short.insar_statistics(width, nbins=120)
+        bin_centers_short = np.max(bin_centers_short) - bin_centers_short
+    else:
+        print("Warning: No projected InSAR data")
+except:
+    print('Warning: No InSAR data')
 # ======================================================================================================================
 # MNT
 # ======================================================================================================================
-try :
-  topodata = MNT(mnt, mnt_err, chemin_mnt)
-  elevations = topodata.elevations(profile.points)
-except :
-  print('Warning: No elevation data')
+try:
+    topodata = MNT(mnt, mnt_err, chemin_mnt)
+    elevations = topodata.elevations(profile.points)
+except:
+    print('Warning: No elevation data')
 # ======================================================================================================================
 # strata
 # ======================================================================================================================
-try :
-  directory_strata = chemin_pendages
-  dip = Dip(directory_strata)
+try:
+    directory_strata = chemin_pendages
+    dip = Dip(directory_strata)
 except:
-  print('Warning: No strata data')
+    print('Warning: No strata data')
 
 # ======================================================================================================================
 # fault
 # ======================================================================================================================
 try:
-  directory_fault = chemin_fault
-  dip_fault = Dip(directory_fault)
+    directory_fault = chemin_fault
+    dip_fault = Dip(directory_fault)
 except:
-  print('warning: No fault data')
+    print('warning: No fault data')
 
 # ======================================================================================================================
 # seismic
@@ -137,79 +132,6 @@ try:
     abs_seismic = np.max(abs_seismic) - abs_seismic
 except:
     print('Warning: No seimsic data')
-
-# ======================================================================================================================
-# Chinese seismic catalog
-# ======================================================================================================================
-catalog_file = '/data/scratch/mathieu/qaidam/data/seismic/chinease_catalog_strip.txt'
-try:
-    data = pd.read_csv(catalog_file, sep=r"\s+", header=None,
-                       names=["date", "mag", "longitude", "latitude", "depth"],
-                       parse_dates=["date"])
-    # Projection des coordonnées
-    transformer = Transformer.from_crs("EPSG:4326", "EPSG:32647", always_xy=True)
-    east, north = transformer.transform(data["longitude"].values, data["latitude"].values)
-    data["east"] = east
-    data["north"] = north
-
-    # Projection sur le profil
-    abscisses_catalog = []
-    depths_catalog = []
-    magnitudes_catalog = []
-    for i in range(len(data)):
-        point = (data["east"][i], data["north"][i])
-        proj = profile.get_projection(point, width_seismic)
-        if proj is not None:
-            xpp, ypp = proj
-            abscisses_catalog.append(xpp)
-            depths_catalog.append(data["depth"][i])
-            magnitudes_catalog.append(data["mag"][i])
-
-    abscisses_catalog = np.max(abscisses_catalog) - np.array(abscisses_catalog)
-    depths_catalog = np.array(depths_catalog)
-    magnitudes_catalog = np.array(magnitudes_catalog)
-except Exception as e:
-    print(f"Warning: Could not load or project Chinese seismic data: {e}")
-
-# ======================================================================================================================
-# cinematic
-# ======================================================================================================================
-params = {
-  # 1ere rampe
-    "beta": 65,  
-    "Y_faille": 18440,
-    "Z_faille": 3400,
-
-  # 2ème rampe
-    "teta": 50,
-    "Y_r2": 18000,
-
-  # 3ème rampe
-    "omega": 30,  # Troisième segment presque horizontal
-    "Y_r3": 7000,
-
-  # ZOne d'étude
-    "Ymin": -3000,  # Début du calcul de la faille
-    "Ymax": 18440,
-
-  # Largeur des charnières
-    "W": 5000,     # Largeur de la première charnière
-    "W2": 5000,    # Largeur de la deuxième charnière
-    
-    "Zhaut": 1800, 
-    "n_strata": 20, # Nombre de strates
-    "di": 2000, # Pas de discrétisation
-    "ite_s": 1, # Nombre d'itérations
-
-    "Y_topo": abscisses,  # Vos données topo
-    "Z_topo": elevations,  # Vos données topo
-    
-    "Ymax2":14000,
-    "Smax": 30, # raccourcissement
-    "n_tot": 1
-}
-
-results = compute_fault_and_axial_surfaces(params) # Kinematic model results
 
 # ======================================================================================================================
 # Plot
@@ -225,27 +147,27 @@ ax2 = fig.add_subplot(gs[1])
 # Topo
 ax1.plot(abscisses, elevations, color="black")
 ax1.set_xlim(xmin, xmax)
+ax1.set_xlabel("Distance (m)")
 ax1.set_ylabel("Altitude (m)")
 ax1.set_ylim([3200, 4200])
 ax1.tick_params(axis='y', labelcolor='k')
 
-# InSAR
+# InSAR
 ax1b = ax1.twinx()
 ax1b.scatter(abscisses_insar_verti, velocities_verti, s=2, alpha=0.1, label="InSAR vertical velocities")
-ax1b.plot(bin_centers_verti, median_vel_verti, color="dodgerblue", linewidth=1, alpha=0.5)
-ax1b.fill_between(bin_centers_verti, median_vel_verti - std_vel_verti, median_vel_verti + std_vel_verti, color="dodgerblue", alpha=0.2)
+# ax1b.plot(bin_centers_verti, median_vel_verti, color="dodgerblue", linewidth=1, alpha=0.5, label="Median")
+# ax1b.fill_between(bin_centers_verti, median_vel_verti - std_vel_verti, median_vel_verti + std_vel_verti,
+#                   color="dodgerblue", alpha=0.2, label="±1 std")
 
-ax1b.scatter(abscisses_insar_short, velocities_short, s=2, alpha=0.1, label="InSAR shortening velocities")
-ax1b.plot(bin_centers_short, median_vel_short, color="coral", linewidth=1, alpha=0.5)
-ax1b.fill_between(bin_centers_short, median_vel_short - std_vel_short, median_vel_short + std_vel_short, color="coral", alpha=0.2)
+ax1b.scatter(abscisses_insar_short, velocities_short, s=2, alpha=0.1, label="InSAR vertical velocities")
+# ax1b.plot(bin_centers_short, median_vel_short, color="coral", linewidth=1, alpha=0.5, label="Median")
+# ax1b.fill_between(bin_centers_short, median_vel_short - std_vel_short, median_vel_short + std_vel_short, color="coral",
+#                   alpha=0.2, label="±1 std")
 
-ax1b.set_ylabel("Velocity", color ='r')
+ax1b.set_ylabel("Velocity", color='r')
 ax1b.set_xlim(xmin, xmax)
-ax1b.set_ylim(-120, 200)
+ax1b.set_ylim(np.min(velocities_verti) - 10, np.max(velocities_verti) + 10)
 ax1b.legend(loc="upper right")
-
-# Cinematic
-ax1b.plot(results["Y_save"], results["Z_save"] - 3307, '-b', label='Déformation calculée')
 
 ### Lower plot
 # Topo
@@ -257,43 +179,28 @@ ax2.set_ylabel('Profondeur (m)')
 dip.print_all(topodata, profile, length_dip, ax2)
 
 # Fault
-# dip_fault.print_all_fault(topodata, profile, length_dip_fault, ax2)
+dip_fault.print_all_fault(topodata, profile, length_dip_fault, ax2)
 
 # Seismic
-sc2 = ax2.scatter(abs_seismic, -np.array(prof_seismic) * 1000 + 3600, c=mag, cmap="YlOrRd", edgecolor="k", s=50)
-ax2.errorbar(abs_seismic, -np.array(prof_seismic) * 1000 + 3600, xerr=rms_values, yerr=rms_values, fmt='none', ecolor='k', capsize=3)
+sc2 = ax2.scatter(abs_seismic, -np.array(prof_seismic) * 1000 + 4000, c=mag, cmap="YlOrRd", edgecolor="k", s=50)
+ax2.errorbar(abs_seismic, -np.array(prof_seismic) * 1000 + 4000, xerr=rms_values, yerr=rms_values, fmt='none', ecolor='k', capsize=3)
 cax = inset_axes(ax2, width="3%", height="30%", loc="lower left", borderpad=1)
-# Chinese catalog
-if len(abscisses_catalog) > 0:
-    sc_catalog = ax2.scatter(abscisses_catalog, -np.array(depths_catalog) * 1000 + 3600, c=magnitudes_catalog, cmap="YlOrRd", edgecolor="k", s=50, label="Catalogue chinois")
 cbar = fig.colorbar(sc2, cax=cax)
 cbar.set_label("Magnitude")
 
-# Cinematic
-ax2.plot(results["Yfaille"], results["Zfaille"], '-r', label='Faille')
-ax2.plot(results["Y_asurf1"], results["Z_asurf1"], '-k', alpha=0.5, label='surface axiale 1')
-ax2.plot(results["Y_asurf2"], results["Z_asurf2"], '-k', alpha=0.5, label='surface axiale 2')
-ax2.plot(results["Y_asurf3"], results["Z_asurf3"], '-k', alpha=0.5, label='surface axiale 3')
-ax2.plot(results["Y_asurf4"], results["Z_asurf4"], '-k', alpha=0.5, label='surface axiale 4')
-ax2.plot(results["Y_r2"], results["Z_r2"], 'or', label="Point d'intersection R2")
-ax2.plot(results["Y_r3"], results["Z_r3"], 'or', label="Point d'intersection R3")
-# ax2.legend(loc="upper right")
+ax2.legend(loc="upper right")
 ax2.grid(True)
-# ax2.legend()
+ax2.legend()
+ax2.axis("equal")
 
 ax2.set_xlim([xmin, xmax])
-ax2.set_ylim([-15000,10000])
-ax2.axis('equal')
-# ======================================================================================================================
-# Bayesian inversion
-# ======================================================================================================================
 
-
+plt.show()
 
 # ======================================================================================================================
 # Save figure
 # ======================================================================================================================
-output_dir = "/data/scratch/mathieu/qaidam/output_fold_qaidam/"
+output_dir = "/data/scratch/mathieu/qaidam/output_fold_qaidam/invert_plan/"
 
 os.makedirs(output_dir, exist_ok=True)
 
