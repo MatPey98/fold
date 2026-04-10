@@ -31,7 +31,7 @@ class Insar:
                     xpp, ypp = proj
                     value = band[row, col]
 
-                    if not np.isnan(value) and np.isfinite(value):
+                    if not np.isnan(value) and np.isfinite(value) and value<1e10:
                         abscisses_insar.append(xpp)
                         velocities.append(value)
 

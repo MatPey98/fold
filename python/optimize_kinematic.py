@@ -15,81 +15,14 @@ from kinematic import compute_fault_and_axial_surfaces
 from profile import Profile
 from read_data import *
 
-# warnings.filterwarnings("ignore", category=FutureWarning)
-# warnings.filterwarnings("ignore", category=RuntimeWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-
-# ======================================================================================================================
-# Paramètres du profil
-# ======================================================================================================================
-width = 100 # Largeur du profil
-width_seismic = 10000 # Largeur des projections de mécanisme au foyer sur le profil
-n = 1000 # Echantillonnage des points le long du profil (résolution du profil)
-nbins = 50 # Pas d'interpolation pour la médiane des points InSAR
-
-# ======================================================================================================================
-# Paramètres MCMC
-# ======================================================================================================================
-niter = 1  # Nombre total d'itérations
-nburn = 1   # Nombre d'itérations de "burn-in"
-n_samples = 4  # Nombre de réalisations à afficher
-chains = 4     # Nombre de chaînes
-cores = 4      # Nombre de cœurs du CPU utilisés
-
-# ======================================================================================================================
-# Paramètres aprioris : U = [lower, upper] ou N = [mu, sigma]
-# ======================================================================================================================
-Ubeta = [30,50]
-Uteta = [7.5, 29]
-Uomega = [1, 7]
-# NY_r2 = [16000, 2000]
-UY_r2 = [11000, 17000]
-UY_r3 = [1000, 10000]
-UW = [1000, 4000]
-UW2 = [1000, 4000]
-USmax = [10, 100]
-
-# ======================================================================================================================
-# Paramètres fixes
-# ======================================================================================================================
-Y_faille = 18520 # Emplacement de la faille en surface
-Z_faille = 3430 # Emplacement de la faille en surface
-Ymin = 1000 # Calcul de la faille
-Ymax = 17800 # Calcul de la faille
-Ymax2 = 14000
-Zhaut = 1800 # Hauteur des charnières
-n_strata = 20
-di = 4000
-ite_s = 1
-n_tot = 1
-
-# ======================================================================================================================
-# Data
-# ======================================================================================================================
-wdir = '/data/scratch/mathieu/qaidam/'
-### Profile :
-coupe = "coupe9.shp"
-chemin_coupe = wdir + "/carto/profile/"
-
-### insar :
-insar_vertical = "vertical_2003-2011_mm_crop03_UTM.tif"
-chemin_insar = wdir + "/data/insar/decomp2026/"
-
-### Mnt :
-mnt = "cop_dem30_92_101_34_40_crop_UTM_v2.tif"
-mnt_err = "DSM_triangulation_errors_merged.tif"
-chemin_mnt = wdir + "/data/DEM/"
-
-
-
-# ======================================================================================================================
-# INPUT PARAMÈTRES : optimize_kinematic.py input_file.py
-# ======================================================================================================================
 def usage():
-  print('invert_plan.py infile.py [-h]')
-  print('-h Show this screen')
+    print('invert_plan.py infile.py [-h]')
+    print('-h Show this screen')
 
-#load input file
+    #load input file
 try:
     opts,args = getopt.getopt(sys.argv[1:], "h", ["help"])
 except:
@@ -98,30 +31,30 @@ except:
 
 for o in sys.argv:
     if o in ("-h","--help"):
-       usage()
-       sys.exit()
+        usage()
+        sys.exit()
 
 if 1==len(sys.argv):
-  usage()
-  assert False, "no input file"
-  print('No input file')
-  sys.exit()
+    usage()
+    assert False, "no input file"
+    print('No input file')
+    sys.exit()
 
 fname=sys.argv[1]
 exec(open(fname).read())
 if len(sys.argv)>1:
-  try:
-    fname=sys.argv[1]
-    print('Read input file {0} '.format(fname))
     try:
-      sys.path.append(path.dirname(path.abspath(fname)))
-      exec ("from "+path.basename(fname)+" import *")
-    except:
-      exec(open(fname).read())
+        fname=sys.argv[1]
+        print('Read input file {0} '.format(fname))
+        try:
+            sys.path.append(path.dirname(path.abspath(fname)))
+            exec ("from "+path.basename(fname)+" import *")
+        except:
+            exec(open(fname).read())
 
-  except Exception as e:
-    print('Problem in input file')
-    sys.exit()
+    except Exception as e:
+        print('Problem in input file')
+        sys.exit()
 
 # ======================================================================================================================
 # LECTURE DES DONNÉES
@@ -140,6 +73,7 @@ except:
 
 # InSAR ----------------------------------------------------------------------------------------------------------------
 def load_insar_data():
+    # vertical
     insar_data_verti = Insar(insar_vertical, chemin_insar, profile)
     abscisses_insar_verti, velocities_verti = insar_data_verti.projection_insar(width)
     abscisses_insar_verti = np.max(abscisses_insar_verti) - abscisses_insar_verti
@@ -148,13 +82,24 @@ def load_insar_data():
     z_insar_filtered = velocities_verti[mask]
     y_insar = abscisses_insar_verti
     z_insar = velocities_verti
-    return y_insar_filtered, z_insar_filtered, z_insar, y_insar
+    
+    # horizontal
+    insar_data_short = Insar(insar_horizontal, chemin_insar, profile)
+    abscisses_insar_short, velocities_short = insar_data_short.projection_insar(width)
+    abscisses_insar_short = np.max(abscisses_insar_short) - abscisses_insar_short
+    y_insar_short_filtered = abscisses_insar_verti[mask]
+    z_insar_short_filtered = velocities_verti[mask]
+    y_insar_short = abscisses_insar_short
+    z_insar_short = velocities_short
+    
+    
+    return y_insar_filtered, z_insar_filtered, z_insar, y_insar, z_insar_short, y_insar_short, y_insar_short_filtered, z_insar_short_filtered
 
 # Initialiser les données une seule fois au lieu de faire le calcul à chaque itérations
-y_insar_filtered, z_insar_filtered, z_insar, y_insar = load_insar_data()
+y_insar_filtered, z_insar_filtered, z_insar, y_insar, z_insar_short, y_insar_short, y_insar_short_filtered, z_insar_short_filtered = load_insar_data()
 
 def data():
-    return z_insar_filtered
+    return z_insar_filtered, z_insar_short_filtered
 
 def Cov():
     sigmad = np.ones_like(z_insar_filtered) * 10
@@ -166,7 +111,7 @@ try:
     abs_seismic, prof_seismic, mag, rms_values = seismic.projection_seismic(width_seismic)
     abs_seismic = np.max(abs_seismic) - abs_seismic
 except:
-    print('Warning: No seimsic data')
+    print('Warning: No seismic data')
 
 # ======================================================================================================================
 # MODÈLE DIRECT (forward_model)
@@ -194,23 +139,34 @@ def forward_model(beta, teta, omega, Y_r2, Y_r3, W, W2, Smax):
         "di": di,
         "ite_s": ite_s,
         "n_tot": n_tot,
+        "Y_topo": y_topo,
+        "Z_topo": z_topo
+
     }
 
     # print(f"Paramètres d'entrée : beta={beta}, teta={teta}, omega={omega}, Y_r2={Y_r2}, Y_r3={Y_r3}, W={W}, W2={W2}, Smax={Smax}")
 
-    results = compute_fault_and_axial_surfaces(params)
+    results = compute_fault_and_axial_surfaces(params, y_topo, z_topo, y_insar, z_insar)
+
+    Ych2 = results["Ych2"]
+    Ych3 = results["Ych3"]
+
 
     # print(f"Résultats de compute_fault_and_axial_surfaces : Y_save={results['Y_save']}, Z_save={results['Z_save']}")
 
-    y_insar_filtered, _, _,_ = load_insar_data()
+    # y_insar_filtered, _, _,_ = load_insar_data()
     Z_interp = np.interp(y_insar_filtered, results["Y_save"], results["Z_save"] - 3307)
+    Z_short_interp = np.interp(y_insar_filtered, results["Y_save"], results["Y_short"] - 3307)
+    
 
     # print(f"Z_interp : {Z_interp}")
 
-    if np.any(np.isnan(Z_interp)) or np.any(np.isinf(Z_interp)):
-        print("Z_interp contient des NaN ou des inf, utilisation de valeurs aléatoires")
+    if np.any(np.isnan(Z_interp)) or np.any(np.isinf(Z_interp)) or np.any(Ych2 < Ych3) or np.any(np.isnan(Y_r2)):
+        # print("Z_interp contient des NaN ou des inf, utilisation de valeurs aléatoires")
         Z_interp = np.random.normal(0, 1e-3, size=len(Z_interp))
-    return Z_interp
+    if np.any(np.isnan(Z_short_interp)) or np.any(np.isinf(Z_short_interp)) or np.any(Ych2 < Ych3) or np.any(np.isnan(Y_r2)):
+        Z_short_interp = np.random.normal(0, 1e-3, size=len(Z_short_interp))
+    return Z_interp, Z_short_interp
 
 # ======================================================================================================================
 # OPÉRATEUR PYTENSOR (ForwardModelOp)
@@ -224,13 +180,13 @@ class ForwardModelOp(pytensor.graph.op.Op):
         try:
             theta_values = [float(val) for val in theta]
             beta, teta, omega, Y_r2, Y_r3, W, W2, Smax = theta_values
-            mu = forward_model(beta, teta, omega, Y_r2, Y_r3, W, W2, Smax)
-            if np.any(np.isnan(mu)) or np.any(np.isinf(mu)):
-                raise ValueError("forward_model a retourné des NaN ou des inf.")
-            outputs[0][0] = np.asarray(mu, dtype=np.float64)
+            z_vert, z_horiz = forward_model(beta, teta, omega, Y_r2, Y_r3, W, W2, Smax)
+            if np.any(np.isnan(z_vert)) or np.any(np.isinf(z_vert)) or np.any(np.isnan(Y_r2)) or np.any(np.isnan(z_horiz)) or np.any(np.isinf(z_horiz)):
+            	raise ValueError("forward_model a retourné des NaN ou des inf.")
+            outputs[0][0] = np.concatenate([z_vert, z_horiz])
         except Exception as e:
             print(f"Erreur dans ForwardModelOp: {e}")
-            y_insar_filtered, _, _, _ = load_insar_data()
+            # y_insar_filtered, _, _, _ = load_insar_data()
             outputs[0][0] = np.ones_like(y_insar_filtered, dtype=np.float64) * 1e6
 
 forward_op = ForwardModelOp()
@@ -245,32 +201,41 @@ def run_inversion():
         teta = pm.Uniform("teta", lower=Uteta[0], upper=Uteta[1])
         omega = pm.Uniform("omega", lower=Uomega[0], upper=Uomega[1])
         Y_r2 = pm.Uniform("Y_r2", lower=UY_r2[0], upper=UY_r2[1])
-        # Y_r2 = pm.Normal("Y_r2", mu=NY_r2[0], sigma=NY_r2[1])
+        # Y_r2 = pm.Normal("Y_r2", mu=NY_r2[0], sigma=NY_r2[1])
         Y_r3 = pm.Uniform("Y_r3", lower=UY_r3[0], upper=UY_r3[1])
         W = pm.Uniform("W", lower=UW[0], upper=UW[1])
         W2 = pm.Uniform("W2", lower=UW2[0], upper=UW2[1])
         Smax = pm.Uniform("Smax", lower=USmax[0], upper=USmax[1])
 
+
         # Empiler les paramètres dans un vecteur theta
         theta = pt.stack([beta, teta, omega, Y_r2, Y_r3, W, W2, Smax])
         mu = forward_op(theta)
+        mu_vert = mu[:len(y_insar_filtered)]
+        mu_horiz = mu[len(y_insar_filtered):]
         mu = pm.Deterministic("mu", mu)
 
-        d_obs = data()
-        sigma = np.sqrt(1.0 / np.diag(Cov()))
+        d_obs_vert, d_obs_horiz = data()
+        sigma_vert = np.sqrt(1.0 / np.diag(Cov()))
+        sigma_horiz = np.ones_like(d_obs_horiz) * 10
 
-        pm.Normal("InSAR_Data", mu=mu, sigma=sigma, observed=d_obs)
-
-        # timer = chains*nburn+niter*cores
-        # with tqdm(total=timer, desc="Sampling") as pbar:
+        pm.Normal("InSAR_Vertical", mu=mu_vert, sigma=sigma_vert, observed=d_obs_vert)
+        pm.Normal("InSAR_Horizontal", mu=mu_horiz, sigma=sigma_horiz, observed=d_obs_horiz)
+        
+        # Filtrer les paramètres abbérants
+        pm.Potential("invalid_parameters", 
+                pm.math.switch(
+                    (beta < teta) | (teta < omega) | (Y_r2 < Y_r3), -1e6, 0)
+                )
+	
+	# Sampling de l'inférence Bayésienne
         trace = pm.sample(
             draws=niter,
             tune=nburn,
             chains=chains,
             cores=cores,
-            step=pm.Metropolis(),
+            step=pm.Metropolis(scaling=10),
             progressbar=True,
-            # callback=lambda trace, draw: pbar.update(1)
         )
     return model, trace
 
@@ -292,8 +257,19 @@ def plot_results(trace):
     summary = az.summary(filtered_trace, var_names=var_names)
     print("\nRésumé des paramètres postérieurs :")
     print(summary)
+    
+    # Graphiques des traces et posteriors ----------------------------------------------------------------------------------
+    plt.rcParams.update({'font.size': 6})
+    try:
+        az.plot_trace(trace, var_names=var_names, compact=True, figsize=(5, 3), combined=True)
+        az.plot_posterior(trace, var_names=var_names, kind='hist',textsize=6, figsize=(5, 3))
+        az.plot_pair(trace, var_names=var_names,kind='hexbin', marginals=True, textsize=6,figsize=(5, 3))
+        az.plot_forest(trace, var_names=["beta", "teta", "omega", "Smax"],combined=True, hdi_prob=0.95, textsize=6, linewidth=1, markersize=2, figsize=(5, 3))
+        az.plot_forest(trace, var_names=["Y_r2", "Y_r3", "W", "W2"],combined=True, hdi_prob=0.95, textsize=6, linewidth=1, markersize=2, figsize=(5, 3))
+    except:
+        print("arviz shut down")
 
-    # Création des figures
+    # mise en forme figure du modèle
     plt.rcParams.update({
         # Taille & résolution
         "figure.figsize": (6, 4),
@@ -319,21 +295,15 @@ def plot_results(trace):
         "grid.alpha": 0.1
     })
 
-# Graphiques des traces et posteriors ----------------------------------------------------------------------------------
-    try:
-        az.plot_trace(trace, var_names=var_names, compact=True, figsize=(5, 3), combined=True)
-        az.plot_posterior(trace, var_names=var_names, kind='hist',textsize=5, figsize=(5, 3))
-        az.plot_pair(trace, var_names=var_names,kind='hexbin', marginals=True, textsize=5,figsize=(5, 3))
-        az.plot_forest(trace, var_names=["beta", "teta", "omega", "Smax"],combined=True, hdi_prob=0.95, textsize=5, linewidth=1, markersize=2, figsize=(5, 3))
-        az.plot_forest(trace, var_names=["Y_r2", "Y_r3", "W", "W2"],combined=True, hdi_prob=0.95, textsize=5, linewidth=1, markersize=2, figsize=(5, 3))
-    except:
-        print("arviz shut down")
-
-    fig, (ax1, ax2) = plt.subplots(2, 1)
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
     ax1b = ax1.twinx()
+    ax2b = ax2.twinx()
     # Sous-graphique 1 : Comparaison données InSAR vs prédictions du modèle
     # y_insar_filtered, z_insar_filtered, z_insar, y_insar = load_insar_data()
-    posterior_predictions = trace.posterior["mu"].mean(dim=["chain", "draw"]).values
+    # Prédictions postérieures
+    mu_all = trace.posterior["mu"].mean(dim=["chain", "draw"]).values
+    mu_vert = mu_all[:len(y_insar_filtered)]
+    mu_horiz = mu_all[len(y_insar_filtered):]
 
     # Topo
     # ax1.plot(y_topo, z_topo, 'k-', linewidth=1,  label="Topographie")
@@ -341,18 +311,27 @@ def plot_results(trace):
     ax1.set_title("Comparaison données InSAR vs prédictions du modèle")
     ax1.grid(True, linestyle='--', alpha=0.5)
     ax1.set_ylabel("Altitude (m)")
+    ax2.plot(y_topo, z_topo, 'k-', linewidth=1, label="Topographie")
+    ax2.set_ylabel("Altitude (m)")
 
     # InSAR et prédictions postérieures
-    ax1b.scatter(y_insar, z_insar, s=2, alpha=0.5, color='tab:blue', label="Elévation verticale (InSAR)")
-    ax1b.plot(y_insar_filtered, posterior_predictions, color='tab:red', linewidth=1.5, label="Prédictions moyennes du modèle")
+    # Vertical
+    ax1b.scatter(y_insar+642, z_insar, s=2, alpha=0.5, color='tab:blue', label="Elévation verticale (InSAR)")
+    ax1b.plot(y_insar_filtered+642, mu_vert, color='tab:red', linewidth=1.5, label="Prédictions moyennes du modèle")
     ax1b.set_xlabel("Position (m)")
     ax1b.set_ylabel("Déformation (mm)")
     ax1b.legend(loc="upper right")
+    # Horizontal
+    ax2b.scatter(y_insar_short+642, z_insar_short, s=2, alpha=0.5, color='tab:orange', label="Données InSAR horizontales")
+    ax2b.plot(y_insar_filtered+642, mu_horiz, color='tab:green', linewidth=1.5, label="Prédictions moyennes (horizontal)")
+    ax2b.set_xlabel("Position (m)")
+    ax2b.set_ylabel("Raccourcissement (m)")
+    ax2b.legend(loc="upper right")
+    ax2b.grid(True, linestyle='--', alpha=0.5)
 
     # Sous-graphique 2 : Représentation de la faille à postériori
     # Tracer la topographie
-    # ax2.plot(y_topo, z_topo, 'k-', label='Topographie')
-    ax2.plot(y_topo, z_topo, 'k-', label='Topographie')
+    ax3.plot(y_topo, z_topo, 'k-', label='Topographie')
 
     # Récupérer les échantillons postérieurs des paramètres
     beta_samples = trace.posterior["beta"].values.flatten()
@@ -378,7 +357,7 @@ def plot_results(trace):
     W2_samples = W2_samples[valid_indices]
     Smax_samples = Smax_samples[valid_indices]
 
-    # Sélectionner quelques échantillons aléatoires pour visualiser plusieurs réalisations
+    # Sélectionner des échantillons aléatoires pour visualiser plusieurs réalisations
     if len(beta_samples) > 0:
         num_samples = min(n_samples, len(beta_samples))
         sample_indices = np.random.choice(len(beta_samples), num_samples, replace=False)
@@ -406,18 +385,10 @@ def plot_results(trace):
             }
 
             try:
-                sample_results = compute_fault_and_axial_surfaces(params_sample)
-
+                sample_results = compute_fault_and_axial_surfaces(params_sample,y_topo, z_topo,y_insar,z_insar)
                 # Tracer la faille pour chaque échantillon
                 if "Yfaille" in sample_results and "Zfaille" in sample_results:
-                    ax2.plot(sample_results["Yfaille"], sample_results["Zfaille"], 'tab:red', alpha=0.1, linewidth=0.5)
-
-            #     # Tracer les surfaces axiales pour chaque échantillon
-            #     for i in range(1, 5):
-            #         y_key = f"Y_asurf{i}"
-            #         z_key = f"Z_asurf{i}"
-            #         if y_key in sample_results and z_key in sample_results:
-            #             ax2.plot(sample_results[y_key], sample_results[z_key], '--k', alpha=0.1)
+                    ax3.plot(sample_results["Yfaille"], sample_results["Zfaille"], 'tab:red', alpha=0.1, linewidth=0.5)
             except Exception as e:
                 print(f"Erreur lors du calcul de la faille pour l'échantillon {idx}: {e}")
 
@@ -453,25 +424,25 @@ def plot_results(trace):
     }
 
     try:
-        mean_results = compute_fault_and_axial_surfaces(params_mean)
+        mean_results = compute_fault_and_axial_surfaces(params_mean,y_topo,z_topo,y_insar,z_insar)
 
         # Tracer la faille moyenne en gras
         if "Yfaille" in mean_results and "Zfaille" in mean_results:
-            ax2.plot(mean_results["Yfaille"], mean_results["Zfaille"], color='tab:red', linewidth=1.5, label="Faille moyenne")
+            ax3.plot(mean_results["Yfaille"], mean_results["Zfaille"], color='tab:red', linewidth=1.5, label="Faille moyenne")
 
         # Tracer les surfaces axiales moyennes
         for i in range(1, n_samples):
             y_key = f"Y_asurf{i}"
             z_key = f"Z_asurf{i}"
             if y_key in mean_results and z_key in mean_results:
-                ax2.plot(mean_results[y_key], mean_results[z_key], 'k--', alpha=0.5, linewidth=0.8, label="Surfaces axiales" if i == 1 else "")
+                ax3.plot(mean_results[y_key], mean_results[z_key], 'k--', alpha=0.5, linewidth=0.8, label="Surfaces axiales" if i == 1 else "")
 
         # Tracer les charnières moyennes
         for i in range(1, n_samples):
             y_key = f"Ych{i}"
             z_key = f"Zch{i}"
             if y_key in mean_results and z_key in mean_results:
-                ax2.scatter(mean_results[y_key], mean_results[z_key], color='tab:red', s=20, label="Charnières" if i == 1 else "", alpha=0.5)
+                ax3.scatter(mean_results[y_key], mean_results[z_key], color='tab:red', s=20, label="Charnières" if i == 1 else "", alpha=0.5)
     except Exception as e:
         print(f"Erreur lors du calcul de la faille moyenne: {e}")
 
@@ -484,15 +455,20 @@ def plot_results(trace):
     # Lim topo
     ax1.set_xlim(min(y_insar), max(y_insar))
     ax1.set_ylim(min(z_topo) - 200, max(z_topo) + 200)
-
+    ax2.set_xlim(min(y_insar), max(y_insar))
+    ax2.set_ylim(min(z_topo) - 200, max(z_topo) + 200)
+    
     # Lim déformations
     ax1b.set_xlim(min(y_insar), max(y_insar))
     ax1b.set_ylim(min(z_insar)-10, max(z_insar)+10)
+    ax2b.set_xlim(min(y_insar), max(y_insar))
+    ax2b.set_ylim(min(z_insar)-10, max(z_insar)+10)
 
     # fig 2
     ax2.set_xlim(min(y_insar), max(y_insar))
     ax1.invert_xaxis()
     ax2.invert_xaxis()
+    ax3.invert_xaxis()
     fig.tight_layout(pad=1.0)
     plt.show()
 

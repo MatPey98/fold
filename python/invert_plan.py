@@ -68,35 +68,111 @@ xmax = abscisses[-1]
 # ======================================================================================================================
 # InSAR
 # ======================================================================================================================
-### vertical
+### vertical 2003-2011
 try:
-    insar_data_verti = Insar(insar_vertical, chemin_insar, profile)
-    abscisses_insar_verti, velocities_verti = insar_data_verti.projection_insar(width)
-    abscisses_insar_verti = np.max(abscisses_insar_verti) - abscisses_insar_verti
+    insar_data_verti_0311 = Insar(insar_vertical_0311, chemin_insar, profile)
+    abscisses_insar_verti_0311, velocities_verti_0311 = insar_data_verti_0311.projection_insar(width)
+    abscisses_insar_verti_0311 = np.max(abscisses_insar_verti_0311) - abscisses_insar_verti_0311
 
     # Vérifier qu’il y a bien des données projetées
-    if len(abscisses_insar_verti) > 0:
-        bin_centers_verti, median_vel_verti, std_vel_verti = insar_data_verti.insar_statistics(width, nbins=120)
-        bin_centers_verti = np.max(bin_centers_verti) - bin_centers_verti
+    if len(abscisses_insar_verti_0311) > 0:
+        bin_centers_verti_0311, median_vel_verti_0311, std_vel_verti_0311 = insar_data_verti_0311.insar_statistics(width, nbins=120)
+        bin_centers_verti_0311 = np.max(bin_centers_verti_0311) - bin_centers_verti_0311
     else:
         print("Warning: No projected InSAR data")
 except:
     print('Warning: No InSAR data')
 
-### shortening
+### Vertical 2011-2019
 try:
-    insar_data_short = Insar(insar_shortening, chemin_insar, profile)
-    abscisses_insar_short, velocities_short = insar_data_short.projection_insar(width)
-    abscisses_insar_short = np.max(abscisses_insar_short) - abscisses_insar_short
+    insar_data_verti_1119 = Insar(insar_vertical_1119, chemin_insar, profile)
+    abscisses_insar_verti_1119, velocities_verti_1119 = insar_data_verti_1119.projection_insar(width)
+    abscisses_insar_verti_1119 = np.max(abscisses_insar_verti_1119) - abscisses_insar_verti_1119
 
     # Vérifier qu’il y a bien des données projetées
-    if len(abscisses_insar_short) > 0:
-        bin_centers_short, median_vel_short, std_vel_short = insar_data_short.insar_statistics(width, nbins=120)
-        bin_centers_short = np.max(bin_centers_short) - bin_centers_short
+    if len(abscisses_insar_verti_1119) > 0:
+        bin_centers_verti_1119, median_vel_verti_1119, std_vel_verti_1119 = insar_data_verti_1119.insar_statistics(width, nbins=120)
+        bin_centers_verti_1119 = np.max(bin_centers_verti_1119) - bin_centers_verti_1119
     else:
         print("Warning: No projected InSAR data")
 except:
     print('Warning: No InSAR data')
+
+### Vertical 2003-2019
+try:
+    insar_data_verti_0319 = Insar(insar_vertical_0319, chemin_insar, profile)
+    abscisses_insar_verti_0319, velocities_verti_0319 = insar_data_verti_0319.projection_insar(width)
+    abscisses_insar_verti_0319 = np.max(abscisses_insar_verti_0319) - abscisses_insar_verti_0319
+
+    # Vérifier qu’il y a bien des données projetées
+    if len(abscisses_insar_verti_0319) > 0:
+        bin_centers_verti_0319, median_vel_verti_0319, std_vel_verti_0319 = insar_data_verti_0319.insar_statistics(width, nbins=120)
+        bin_centers_verti_0319 = np.max(bin_centers_verti_0319) - bin_centers_verti_0319
+    else:
+        print("Warning: No projected InSAR data")
+except:
+    print('Warning: No InSAR data')
+
+### Cosismique 2004 
+try:
+    insar_data_LOS_co2004 = Insar(insar_LOS_co2004, chemin_insar, profile)
+    abscisses_insar_LOS_co2004, velocities_LOS_co2004 = insar_data_LOS_co2004.projection_insar(width)
+    abscisses_insar_LOS_co2004 = np.max(abscisses_insar_LOS_co2004) - abscisses_insar_LOS_co2004
+
+    # Vérifier qu’il y a bien des données projetées
+    if len(abscisses_insar_LOS_co2004) > 0:
+        bin_centers_LOS_co2004, median_vel_LOS_co2004, std_vel_LOS_co2004 = insar_data_LOS_co2004.insar_statistics(width, nbins=120)
+        bin_centers_LOS_co2004 = np.max(bin_centers_LOS_co2004) - bin_centers_LOS_co2004
+    else:
+        print("Warning: No projected InSAR data")
+except:
+    print('Warning: No InSAR data')
+
+### Shortening 2003-2011
+try:
+    insar_data_short_0311 = Insar(insar_short_0311, chemin_insar, profile)
+    abscisses_insar_short_0311, velocities_short_0311 = insar_data_short_0311.projection_insar(width)
+    abscisses_insar_short_0311 = np.max(abscisses_insar_short_0311) - abscisses_insar_short_0311
+
+    # Vérifier qu’il y a bien des données projetées
+    if len(abscisses_insar_short_0311) > 0:
+        bin_centers_short_0311, median_vel_short_0311, std_vel_short_0311 = insar_data_short_0311.insar_statistics(width, nbins=120)
+        bin_centers_short_0311 = np.max(bin_centers_short_0311) - bin_centers_short_0311
+    else:
+        print("Warning: No projected InSAR data")
+except:
+    print('Warning: No InSAR data')
+
+### Shortening 2011-2019
+try:
+    insar_data_short_1119 = Insar(insar_short_1119, chemin_insar, profile)
+    abscisses_insar_short_1119, velocities_short_1119 = insar_data_short_1119.projection_insar(width)
+    abscisses_insar_short_1119 = np.max(abscisses_insar_short_1119) - abscisses_insar_short_1119
+
+    # Vérifier qu’il y a bien des données projetées
+    if len(abscisses_insar_short_1119) > 0:
+        bin_centers_short_1119, median_vel_short_1119, std_vel_short_1119 = insar_data_short_1119.insar_statistics(width, nbins=120)
+        bin_centers_short_1119 = np.max(bin_centers_short_1119) - bin_centers_short_1119
+    else:
+        print("Warning: No projected InSAR data")
+except:
+    print('Warning: No InSAR data')
+
+### Shortening 2003-2019
+try:
+    insar_data_short_0319 = Insar(insar_short_0319, chemin_insar, profile)
+    abscisses_insar_short_0319, velocities_short_0319 = insar_data_short_0319.projection_insar(width)
+    abscisses_insar_short_0319 = np.max(abscisses_insar_short_0319) - abscisses_insar_short_0319
+
+    # Vérifier qu’il y a bien des données projetées
+    if len(abscisses_insar_short_0319) > 0:
+        bin_centers_short_0319, median_vel_short_0319, std_vel_short_0319 = insar_data_short_0319.insar_statistics(width, nbins=120)
+        bin_centers_short_0319 = np.max(bin_centers_short_0319) - bin_centers_short_0319
+    else:
+        print("Warning: No projected InSAR data")
+except:
+    print('Warning: No InSAR data')
+
 # ======================================================================================================================
 # MNT
 # ======================================================================================================================
@@ -149,24 +225,61 @@ ax1.plot(abscisses, elevations, color="black")
 ax1.set_xlim(xmin, xmax)
 ax1.set_xlabel("Distance (m)")
 ax1.set_ylabel("Altitude (m)")
-ax1.set_ylim([3200, 4200])
+ax1.set_ylim([np.min(elevations)-200, np.max(elevations)+200])
 ax1.tick_params(axis='y', labelcolor='k')
 
 # InSAR
+# vertical
 ax1b = ax1.twinx()
-ax1b.scatter(abscisses_insar_verti, velocities_verti, s=2, alpha=0.1, label="InSAR vertical velocities")
-# ax1b.plot(bin_centers_verti, median_vel_verti, color="dodgerblue", linewidth=1, alpha=0.5, label="Median")
-# ax1b.fill_between(bin_centers_verti, median_vel_verti - std_vel_verti, median_vel_verti + std_vel_verti,
-#                   color="dodgerblue", alpha=0.2, label="±1 std")
+try:
+    #ax1b.scatter(abscisses_insar_verti_0311, velocities_verti_0311, s=2, alpha=0.1, color="blue")
+    ax1b.plot(bin_centers_verti_0311, median_vel_verti_0311, color="dodgerblue", linewidth=2, alpha=1, label="InSAR déplacements verticaux 2003-2011")
+    ax1b.fill_between(bin_centers_verti_0311, median_vel_verti_0311 - std_vel_verti_0311, median_vel_verti_0311 + std_vel_verti_0311,
+                      color="dodgerblue", alpha=0.2)
 
-ax1b.scatter(abscisses_insar_short, velocities_short, s=2, alpha=0.1, label="InSAR vertical velocities")
-# ax1b.plot(bin_centers_short, median_vel_short, color="coral", linewidth=1, alpha=0.5, label="Median")
-# ax1b.fill_between(bin_centers_short, median_vel_short - std_vel_short, median_vel_short + std_vel_short, color="coral",
-#                   alpha=0.2, label="±1 std")
+    #ax1b.scatter(abscisses_insar_verti_1119, velocities_verti_1119, s=2, alpha=0.1, color="orange")
+    ax1b.plot(bin_centers_verti_1119, median_vel_verti_1119, color="coral", linewidth=2, alpha=1, label="InSAR déplacements verticaux 2011-2019")
+    ax1b.fill_between(bin_centers_verti_1119, median_vel_verti_1119 - std_vel_verti_1119, median_vel_verti_1119 + std_vel_verti_1119, color="coral",
+                      alpha=0.2)
+
+    #ax1b.scatter(abscisses_insar_verti_0319, velocities_verti_0319, s=2, alpha=0.1, color="green")
+    ax1b.plot(bin_centers_verti_0319, median_vel_verti_0319, color="darkseagreen", linewidth=2, alpha=1, label="InSAR déplacements verticaux 2003-2019 ")
+    ax1b.fill_between(bin_centers_verti_0319, median_vel_verti_0319 - std_vel_verti_0319, median_vel_verti_0319 + std_vel_verti_0319, color="darkseagreen",
+                      alpha=0.2)
+except:
+    print("can't print vertical data")
+
+# Co-seismic 2004
+try:
+    #ax1b.scatter(abscisses_insar_LOS_co2004, velocities_LOS_co2004, s=2, alpha=0.1, color="blue")
+    ax1b.plot(bin_centers_LOS_co2004, median_vel_LOS_co2004, color="red", linewidth=2, alpha=1, label="InSAR Co-sismique 2004")
+    ax1b.fill_between(bin_centers_LOS_co2004, median_vel_LOS_co2004 - std_vel_LOS_co2004, median_vel_LOS_co2004 + std_vel_LOS_co2004,
+                   color="red", alpha=0.2)
+except:
+    print("can't print co-seismic 2004 data")
+
+# Shortening
+try:
+    #ax1b.scatter(abscisses_insar_short_0311, velocities_short_0311, s=2, alpha=0.1, color="blue")
+    ax1b.plot(bin_centers_short_0311, median_vel_short_0311, color="dodgerblue", linewidth=2, alpha=1, label="InSAR déplacements horizontaux 2003-2011")
+    ax1b.fill_between(bin_centers_short_0311, median_vel_short_0311 - std_vel_short_0311, median_vel_short_0311 + std_vel_short_0311,
+                      color="dodgerblue", alpha=0.2)
+
+    #ax1b.scatter(abscisses_insar_short_1119, velocities_short_1119, s=2, alpha=0.1, color="orange")
+    ax1b.plot(bin_centers_short_1119, median_vel_short_1119, color="coral", linewidth=2, alpha=1, label="InSAR déplacements horizontaux 2011-2019")
+    ax1b.fill_between(bin_centers_short_1119, median_vel_short_1119 - std_vel_short_1119, median_vel_short_1119 + std_vel_short_1119, color="coral",
+                      alpha=0.2)
+
+    #ax1b.scatter(abscisses_insar_short_0319, velocities_short_0319, s=2, alpha=0.1, color="green")
+    ax1b.plot(bin_centers_short_0319, median_vel_short_0319, color="darkseagreen", linewidth=2, alpha=1, label="InSAR déplacements horizontaux 2003-2019")
+    ax1b.fill_between(bin_centers_short_0319, median_vel_short_0319 - std_vel_short_0319, median_vel_short_0319 + std_vel_short_0319, color="darkseagreen",
+                      alpha=0.2)
+except:
+    print("can't print shortening data")
 
 ax1b.set_ylabel("Velocity", color='r')
 ax1b.set_xlim(xmin, xmax)
-ax1b.set_ylim(np.min(velocities_verti) - 10, np.max(velocities_verti) + 10)
+ax1b.set_ylim(np.min(velocities_short_0319) - 10, np.max(velocities_short_0319) + 10)
 ax1b.legend(loc="upper right")
 
 ### Lower plot
@@ -182,8 +295,9 @@ dip.print_all(topodata, profile, length_dip, ax2)
 dip_fault.print_all_fault(topodata, profile, length_dip_fault, ax2)
 
 # Seismic
-sc2 = ax2.scatter(abs_seismic, -np.array(prof_seismic) * 1000 + 4000, c=mag, cmap="YlOrRd", edgecolor="k", s=50)
-ax2.errorbar(abs_seismic, -np.array(prof_seismic) * 1000 + 4000, xerr=rms_values, yerr=rms_values, fmt='none', ecolor='k', capsize=3)
+sizes = 50 + 150 * (mag - np.min(mag)) / (np.max(mag) - np.min(mag)) # Normalisation de la taille des points
+sc2 = ax2.scatter(abs_seismic, -np.array(prof_seismic) * 1000 + 4000, c=mag, cmap="YlOrRd", edgecolor="k", s=sizes)
+ax2.errorbar(abs_seismic, -np.array(prof_seismic) * 1000 + 4000, xerr=2000, yerr=2000, fmt='none', ecolor='k', capsize=3)
 cax = inset_axes(ax2, width="3%", height="30%", loc="lower left", borderpad=1)
 cbar = fig.colorbar(sc2, cax=cax)
 cbar.set_label("Magnitude")
@@ -200,7 +314,7 @@ plt.show()
 # ======================================================================================================================
 # Save figure
 # ======================================================================================================================
-output_dir = "/data/scratch/mathieu/qaidam/output_fold_qaidam/invert_plan/"
+output_dir = "/data/scratch/mathieu/qaidam/output/coupes_invert_plan/"
 
 os.makedirs(output_dir, exist_ok=True)
 

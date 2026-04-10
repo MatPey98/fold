@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-def compute_fault_and_axial_surfaces(params):
+def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
     # ============================================================================
     # PARAMETRES SETTING (identique au MATLAB)
     # ============================================================================
@@ -200,8 +200,10 @@ def compute_fault_and_axial_surfaces(params):
     # ============================================================================
     # LECTURE DES DONNEES TOPO ET INSAR
     # ============================================================================
-    Y_topo, Z_topo = np.loadtxt('profil_topo.txt', unpack=True)
-    Y_insar, Z_insar = np.loadtxt('Data_insar.txt', unpack=True)
+    #Y_topo = params.get("Z_topo", np.linspace(0, 20000, 1000))
+    #Z_topo = params.get("Z_topo", np.linspace(0, 20000, 1000))
+    #Y_insar = params.get("Z_insar", np.linspace(0, 20000, 1000))
+    #Z_insar = params.get("Z_insar", np.linspace(0, 20000, 1000))
     Y_insar = np.max(Y_insar) - Y_insar
     Y_topo = np.max(Y_topo) - Y_topo
 
@@ -218,7 +220,7 @@ def compute_fault_and_axial_surfaces(params):
 
     Y_save = np.zeros_like(G_Y0) #####################A VOIR##########################
     Z_save = np.zeros_like(G_Z0)
-
+    Y_init = G_Y0.copy()
     deltaZ_char2 = Rc * np.cos(teta)
     deltaY_char2 = Rc * np.sin(teta)
 
@@ -419,9 +421,9 @@ def compute_fault_and_axial_surfaces(params):
             mask = (Y.copy() < Y_faille) & (Z.copy() < Y_faille)
             Y_save = Y.copy()[mask]
             Z_save = Z.copy()[mask]
-
-            # Y_save = Y.copy()
-            # Z_save = Z.copy()
+            Y_short = Y_init[mask] - Y_save
+			
+		
         S += deltaS
 
     return {
@@ -437,6 +439,7 @@ def compute_fault_and_axial_surfaces(params):
         "Z_asurf4": Z_asurf4,
         "Y_save": Y_save,
         "Z_save": Z_save,
+        "Y_short": Y_short,
         "Y_topo": Y_topo,
         "Z_topo": Z_topo,
         "Y_insar": Y_insar,
