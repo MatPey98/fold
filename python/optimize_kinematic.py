@@ -87,10 +87,11 @@ def load_insar_data():
     insar_data_short = Insar(insar_horizontal, chemin_insar, profile)
     abscisses_insar_short, velocities_short = insar_data_short.projection_insar(width)
     abscisses_insar_short = np.max(abscisses_insar_short) - abscisses_insar_short
-    y_insar_short_filtered = abscisses_insar_verti[mask]
-    z_insar_short_filtered = velocities_verti[mask]
+    mask_short = (abscisses_insar_short < Ymax) & (abscisses_insar_short > Ymin)
     y_insar_short = abscisses_insar_short
     z_insar_short = velocities_short
+    y_insar_short_filtered = y_insar_short[mask_short]
+    z_insar_short_filtered = z_insar_short[mask_short]
     
     
     return y_insar_filtered, z_insar_filtered, z_insar, y_insar, z_insar_short, y_insar_short, y_insar_short_filtered, z_insar_short_filtered
@@ -156,7 +157,7 @@ def forward_model(beta, teta, omega, Y_r2, Y_r3, W, W2, Smax):
 
     # y_insar_filtered, _, _,_ = load_insar_data()
     Z_interp = np.interp(y_insar_filtered, results["Y_save"], results["Z_save"] - 3307)
-    Z_short_interp = np.interp(y_insar_filtered, results["Y_save"], results["Y_short"] - 3307)
+    Z_short_interp = np.interp(y_insar_short_filtered, results["Y_save"], results["Y_short"] - 3307)
     
 
     # print(f"Z_interp : {Z_interp}")
@@ -187,7 +188,7 @@ class ForwardModelOp(pytensor.graph.op.Op):
         except Exception as e:
             print(f"Erreur dans ForwardModelOp: {e}")
             # y_insar_filtered, _, _, _ = load_insar_data()
-            outputs[0][0] = np.ones_like(y_insar_filtered, dtype=np.float64) * 1e6
+            outputs[0][0] = np.ones(len(y_insar_filtered) + len(y_insar_short_filtered)) * 1e6
 
 forward_op = ForwardModelOp()
 
@@ -201,7 +202,6 @@ def run_inversion():
         teta = pm.Uniform("teta", lower=Uteta[0], upper=Uteta[1])
         omega = pm.Uniform("omega", lower=Uomega[0], upper=Uomega[1])
         Y_r2 = pm.Uniform("Y_r2", lower=UY_r2[0], upper=UY_r2[1])
-        # Y_r2 = pm.Normal("Y_r2", mu=NY_r2[0], sigma=NY_r2[1])
         Y_r3 = pm.Uniform("Y_r3", lower=UY_r3[0], upper=UY_r3[1])
         W = pm.Uniform("W", lower=UW[0], upper=UW[1])
         W2 = pm.Uniform("W2", lower=UW2[0], upper=UW2[1])
@@ -217,7 +217,7 @@ def run_inversion():
 
         d_obs_vert, d_obs_horiz = data()
         sigma_vert = np.sqrt(1.0 / np.diag(Cov()))
-        sigma_horiz = np.ones_like(d_obs_horiz) * 10
+        sigma_horiz = np.ones_like(d_obs_horiz) * 1.0
 
         pm.Normal("InSAR_Vertical", mu=mu_vert, sigma=sigma_vert, observed=d_obs_vert)
         pm.Normal("InSAR_Horizontal", mu=mu_horiz, sigma=sigma_horiz, observed=d_obs_horiz)
@@ -323,7 +323,7 @@ def plot_results(trace):
     ax1b.legend(loc="upper right")
     # Horizontal
     ax2b.scatter(y_insar_short+642, z_insar_short, s=2, alpha=0.5, color='tab:orange', label="Données InSAR horizontales")
-    ax2b.plot(y_insar_filtered+642, mu_horiz, color='tab:green', linewidth=1.5, label="Prédictions moyennes (horizontal)")
+    ax2b.plot(y_insar_short_filtered+642, mu_horiz, color='tab:green', linewidth=1.5, label="Prédictions moyennes (horizontal)")
     ax2b.set_xlabel("Position (m)")
     ax2b.set_ylabel("Raccourcissement (m)")
     ax2b.legend(loc="upper right")
