@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# !/usr/bin/env python3
 # -*- coding:utf-8 -*-
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,37 +18,40 @@ from read_data import *
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
+
 def usage():
     print('invert_plan.py infile.py [-h]')
     print('-h Show this screen')
 
-    #load input file
+    # load input file
+
+
 try:
-    opts,args = getopt.getopt(sys.argv[1:], "h", ["help"])
+    opts, args = getopt.getopt(sys.argv[1:], "h", ["help"])
 except:
     print("for help use --help")
     sys.exit()
 
 for o in sys.argv:
-    if o in ("-h","--help"):
+    if o in ("-h", "--help"):
         usage()
         sys.exit()
 
-if 1==len(sys.argv):
+if 1 == len(sys.argv):
     usage()
     assert False, "no input file"
     print('No input file')
     sys.exit()
 
-fname=sys.argv[1]
+fname = sys.argv[1]
 exec(open(fname).read())
-if len(sys.argv)>1:
+if len(sys.argv) > 1:
     try:
-        fname=sys.argv[1]
+        fname = sys.argv[1]
         print('Read input file {0} '.format(fname))
         try:
             sys.path.append(path.dirname(path.abspath(fname)))
-            exec ("from "+path.basename(fname)+" import *")
+            exec("from " + path.basename(fname) + " import *")
         except:
             exec(open(fname).read())
 
@@ -71,6 +74,7 @@ try:
 except:
     print('Warning: No elevation data')
 
+
 # InSAR ----------------------------------------------------------------------------------------------------------------
 def load_insar_data():
     # vertical
@@ -82,37 +86,29 @@ def load_insar_data():
     z_insar_filtered = velocities_verti[mask]
     y_insar = abscisses_insar_verti
     z_insar = velocities_verti
-    
-    # horizontal
-    insar_data_short = Insar(insar_horizontal, chemin_insar, profile)
-    abscisses_insar_short, velocities_short = insar_data_short.projection_insar(width)
-    abscisses_insar_short = np.max(abscisses_insar_short) - abscisses_insar_short
-    mask_short = (abscisses_insar_short < Ymax) & (abscisses_insar_short > Ymin)
-    y_insar_short = abscisses_insar_short
-    z_insar_short = velocities_short
-    y_insar_short_filtered = y_insar_short[mask_short]
-    z_insar_short_filtered = z_insar_short[mask_short]
-    
-    
-    return y_insar_filtered, z_insar_filtered, z_insar, y_insar, z_insar_short, y_insar_short, y_insar_short_filtered, z_insar_short_filtered
 
-# Initialiser les données une seule fois au lieu de faire le calcul à chaque itérations
-y_insar_filtered, z_insar_filtered, z_insar, y_insar, z_insar_short, y_insar_short, y_insar_short_filtered, z_insar_short_filtered = load_insar_data()
+    # Données horizontales (raccourcissement)
+    insar_data_horiz = Insar(insar_horizontal, chemin_insar, profile)
+    abscisses_insar_horiz, velocities_horiz = insar_data_horiz.projection_insar(width)
+    y_insar_short = np.max(abscisses_insar_horiz) - abscisses_insar_horiz
+    z_insar_short = velocities_horiz
+    y_insar_short_filtered = y_insar_short[mask]
+    z_insar_short_filtered = z_insar_short[mask]
+
+    return y_insar_filtered, z_insar_filtered, z_insar, y_insar, z_insar_short, y_insar_short, z_insar_short_filtered, y_insar_short_filtered
+
+
+# Initialiser les données une seule fois au lieu de faire le calcul à chaque itération
+y_insar_filtered, z_insar_filtered, z_insar, y_insar, z_insar_short, y_insar_short, z_insar_short_filtered, y_insar_short_filtered = load_insar_data()
+
 
 def data():
     return z_insar_filtered, z_insar_short_filtered
 
+
 def Cov():
     sigmad = np.ones_like(z_insar_filtered) * 10
-    return np.diag(1.0 / sigmad**2)
-
-# Seismic --------------------------------------------------------------------------------------------------------------
-try:
-    seismic = Seismic(seismic, chemin_seismic, profile)
-    abs_seismic, prof_seismic, mag, rms_values = seismic.projection_seismic(width_seismic)
-    abs_seismic = np.max(abs_seismic) - abs_seismic
-except:
-    print('Warning: No seismic data')
+    return np.diag(1.0 / sigmad ** 2)
 
 # ======================================================================================================================
 # MODÈLE DIRECT (forward_model)
@@ -152,22 +148,17 @@ def forward_model(beta, teta, omega, Y_r2, Y_r3, W, W2, Smax):
     Ych2 = results["Ych2"]
     Ych3 = results["Ych3"]
 
-
-    # print(f"Résultats de compute_fault_and_axial_surfaces : Y_save={results['Y_save']}, Z_save={results['Z_save']}")
-
-    # y_insar_filtered, _, _,_ = load_insar_data()
     Z_interp = np.interp(y_insar_filtered, results["Y_save"], results["Z_save"] - 3307)
-    Z_short_interp = np.interp(y_insar_short_filtered, results["Y_save"], results["Y_short"] - 3307)
-    
-
-    # print(f"Z_interp : {Z_interp}")
+    raccourcissement_interp = np.interp(y_insar_filtered, results["Y_save"], results["raccourcissement_horiz"])
 
     if np.any(np.isnan(Z_interp)) or np.any(np.isinf(Z_interp)) or np.any(Ych2 < Ych3) or np.any(np.isnan(Y_r2)):
         # print("Z_interp contient des NaN ou des inf, utilisation de valeurs aléatoires")
         Z_interp = np.random.normal(0, 1e-3, size=len(Z_interp))
-    if np.any(np.isnan(Z_short_interp)) or np.any(np.isinf(Z_short_interp)) or np.any(Ych2 < Ych3) or np.any(np.isnan(Y_r2)):
-        Z_short_interp = np.random.normal(0, 1e-3, size=len(Z_short_interp))
-    return Z_interp, Z_short_interp
+    if np.any(np.isnan(raccourcissement_interp)) or np.any(np.isinf(raccourcissement_interp)) or np.any(Ych2 < Ych3) or np.any(np.isnan(Y_r2)):
+        # print("raccourcissement_interp contient des NaN ou des inf, utilisation de valeurs aléatoires")
+        raccourcissement_interp = np.random.normal(0, 1e-3, size=len(raccourcissement_interp))
+    return Z_interp, raccourcissement_interp
+
 
 # ======================================================================================================================
 # OPÉRATEUR PYTENSOR (ForwardModelOp)
@@ -182,15 +173,16 @@ class ForwardModelOp(pytensor.graph.op.Op):
             theta_values = [float(val) for val in theta]
             beta, teta, omega, Y_r2, Y_r3, W, W2, Smax = theta_values
             z_vert, z_horiz = forward_model(beta, teta, omega, Y_r2, Y_r3, W, W2, Smax)
-            if np.any(np.isnan(z_vert)) or np.any(np.isinf(z_vert)) or np.any(np.isnan(Y_r2)) or np.any(np.isnan(z_horiz)) or np.any(np.isinf(z_horiz)):
-            	raise ValueError("forward_model a retourné des NaN ou des inf.")
+            if np.any(np.isnan(z_vert)) or np.any(np.isinf(z_vert)) or np.any(np.isnan(z_horiz)) or np.any(np.isinf(z_horiz)):
+                raise ValueError("forward_model a retourné des NaN ou des inf.")
             outputs[0][0] = np.concatenate([z_vert, z_horiz])
         except Exception as e:
             print(f"Erreur dans ForwardModelOp: {e}")
-            # y_insar_filtered, _, _, _ = load_insar_data()
-            outputs[0][0] = np.ones(len(y_insar_filtered) + len(y_insar_short_filtered)) * 1e6
+            outputs[0][0] = np.ones(2 * len(y_insar_filtered)) * 1e6
+
 
 forward_op = ForwardModelOp()
+
 
 # ======================================================================================================================
 # INFÉRENCE BAYÉSIENNE
@@ -207,7 +199,6 @@ def run_inversion():
         W2 = pm.Uniform("W2", lower=UW2[0], upper=UW2[1])
         Smax = pm.Uniform("Smax", lower=USmax[0], upper=USmax[1])
 
-
         # Empiler les paramètres dans un vecteur theta
         theta = pt.stack([beta, teta, omega, Y_r2, Y_r3, W, W2, Smax])
         mu = forward_op(theta)
@@ -216,19 +207,21 @@ def run_inversion():
         mu = pm.Deterministic("mu", mu)
 
         d_obs_vert, d_obs_horiz = data()
-        sigma_vert = np.sqrt(1.0 / np.diag(Cov()))
-        sigma_horiz = np.ones_like(d_obs_horiz) * 1.0
+        #sigma_vert = np.sqrt(1.0 / np.diag(Cov()))
+        #sigma_horiz = np.ones_like(d_obs_horiz) * 1.0
+        sigma_vert = 10
+        sigma_horiz = 50
 
         pm.Normal("InSAR_Vertical", mu=mu_vert, sigma=sigma_vert, observed=d_obs_vert)
         pm.Normal("InSAR_Horizontal", mu=mu_horiz, sigma=sigma_horiz, observed=d_obs_horiz)
-        
+
         # Filtrer les paramètres abbérants
-        pm.Potential("invalid_parameters", 
-                pm.math.switch(
-                    (beta < teta) | (teta < omega) | (Y_r2 < Y_r3), -1e6, 0)
-                )
-	
-	# Sampling de l'inférence Bayésienne
+        pm.Potential("invalid_parameters",
+                     pm.math.switch(
+                         (beta < teta) | (teta < omega) | (Y_r2 < Y_r3), -1e6, 0)
+                     )
+
+        # Sampling de l'inférence Bayésienne
         trace = pm.sample(
             draws=niter,
             tune=nburn,
@@ -238,6 +231,7 @@ def run_inversion():
             progressbar=True,
         )
     return model, trace
+
 
 # ======================================================================================================================
 # VISUALISATION
@@ -257,15 +251,17 @@ def plot_results(trace):
     summary = az.summary(filtered_trace, var_names=var_names)
     print("\nRésumé des paramètres postérieurs :")
     print(summary)
-    
+
     # Graphiques des traces et posteriors ----------------------------------------------------------------------------------
     plt.rcParams.update({'font.size': 6})
     try:
         az.plot_trace(trace, var_names=var_names, compact=True, figsize=(5, 3), combined=True)
-        az.plot_posterior(trace, var_names=var_names, kind='hist',textsize=6, figsize=(5, 3))
-        az.plot_pair(trace, var_names=var_names,kind='hexbin', marginals=True, textsize=6,figsize=(5, 3))
-        az.plot_forest(trace, var_names=["beta", "teta", "omega", "Smax"],combined=True, hdi_prob=0.95, textsize=6, linewidth=1, markersize=2, figsize=(5, 3))
-        az.plot_forest(trace, var_names=["Y_r2", "Y_r3", "W", "W2"],combined=True, hdi_prob=0.95, textsize=6, linewidth=1, markersize=2, figsize=(5, 3))
+        az.plot_posterior(trace, var_names=var_names, kind='hist', textsize=6, figsize=(5, 3))
+        az.plot_pair(trace, var_names=var_names, kind='hexbin', marginals=True, textsize=6, figsize=(5, 3))
+        az.plot_forest(trace, var_names=["beta", "teta", "omega", "Smax"], combined=True, hdi_prob=0.95, textsize=6,
+                       linewidth=1, markersize=2, figsize=(5, 3))
+        az.plot_forest(trace, var_names=["Y_r2", "Y_r3", "W", "W2"], combined=True, hdi_prob=0.95, textsize=6,
+                       linewidth=1, markersize=2, figsize=(5, 3))
     except:
         print("arviz shut down")
 
@@ -295,43 +291,50 @@ def plot_results(trace):
         "grid.alpha": 0.1
     })
 
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
-    ax1b = ax1.twinx()
-    ax2b = ax2.twinx()
-    # Sous-graphique 1 : Comparaison données InSAR vs prédictions du modèle
-    # y_insar_filtered, z_insar_filtered, z_insar, y_insar = load_insar_data()
-    # Prédictions postérieures
+    # Résultats : déplacements verticaux et horizontaux
     mu_all = trace.posterior["mu"].mean(dim=["chain", "draw"]).values
     mu_vert = mu_all[:len(y_insar_filtered)]
     mu_horiz = mu_all[len(y_insar_filtered):]
 
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
+
+    # Plot 1 -----------------------------------------------------------------------------------------------------------
+    # Sous-graphique 1 : Comparaison des données InSAR avec les prédictions du modèle
     # Topo
-    # ax1.plot(y_topo, z_topo, 'k-', linewidth=1,  label="Topographie")
-    ax1.plot(y_topo, z_topo, 'k-', linewidth=1, label="Topographie")
     ax1.set_title("Comparaison données InSAR vs prédictions du modèle")
-    ax1.grid(True, linestyle='--', alpha=0.5)
+    ax1.plot(y_topo, z_topo, 'k-', linewidth=1, label="Topographie")
     ax1.set_ylabel("Altitude (m)")
+    ax1.legend(loc="upper left")
+
+    # Insar
+    ax1b = ax1.twinx()
+    ax1b.scatter(y_insar, z_insar, s=2, alpha=0.5, color='tab:blue', label="Soulèvement vertical InSAR")
+    
+    # Vertical
+    ax1b.plot(y_insar_filtered, mu_vert, color='tab:red', linewidth=1.5, label="Prédictions moyennes du modèle")###
+    ax1b.set_ylabel("Déformation verticale (mm)")
+    ax1b.grid(True, linestyle='--', alpha=0.1)
+    ax1b.legend(loc="upper right")
+
+    # Horizontal
+
+    # Plot 2 -----------------------------------------------------------------------------------------------------------
+    # Topo
     ax2.plot(y_topo, z_topo, 'k-', linewidth=1, label="Topographie")
     ax2.set_ylabel("Altitude (m)")
+    ax2.legend(loc="upper left")
 
-    # InSAR et prédictions postérieures
-    # Vertical
-    ax1b.scatter(y_insar+642, z_insar, s=2, alpha=0.5, color='tab:blue', label="Elévation verticale (InSAR)")
-    ax1b.plot(y_insar_filtered+642, mu_vert, color='tab:red', linewidth=1.5, label="Prédictions moyennes du modèle")
-    ax1b.set_xlabel("Position (m)")
-    ax1b.set_ylabel("Déformation (mm)")
-    ax1b.legend(loc="upper right")
-    # Horizontal
-    ax2b.scatter(y_insar_short+642, z_insar_short, s=2, alpha=0.5, color='tab:orange', label="Données InSAR horizontales")
-    ax2b.plot(y_insar_short_filtered+642, mu_horiz, color='tab:green', linewidth=1.5, label="Prédictions moyennes (horizontal)")
-    ax2b.set_xlabel("Position (m)")
-    ax2b.set_ylabel("Raccourcissement (m)")
+    ax2b = ax2.twinx()
+    ax2b.scatter(y_insar_short, z_insar_short, s=2, alpha=0.5, color='tab:orange', label="Raccourcissement N022° InSAR")###
+    ax2b.plot(y_insar_filtered, mu_horiz, color='tab:green', linewidth=1.5, label="Prédictions moyennes du modèle")###
+    ax2b.grid(True, linestyle='--', alpha=0.1)
+    ax2b.set_ylabel("Raccourcissement (mm)")
     ax2b.legend(loc="upper right")
-    ax2b.grid(True, linestyle='--', alpha=0.5)
 
-    # Sous-graphique 2 : Représentation de la faille à postériori
-    # Tracer la topographie
+    # Plot 3 -----------------------------------------------------------------------------------------------------------
+    # topo
     ax3.plot(y_topo, z_topo, 'k-', label='Topographie')
+    ax3.set_ylabel("Profondeur (m)")
 
     # Récupérer les échantillons postérieurs des paramètres
     beta_samples = trace.posterior["beta"].values.flatten()
@@ -385,7 +388,7 @@ def plot_results(trace):
             }
 
             try:
-                sample_results = compute_fault_and_axial_surfaces(params_sample,y_topo, z_topo,y_insar,z_insar)
+                sample_results = compute_fault_and_axial_surfaces(params_sample, y_topo, z_topo, y_insar, z_insar)
                 # Tracer la faille pour chaque échantillon
                 if "Yfaille" in sample_results and "Zfaille" in sample_results:
                     ax3.plot(sample_results["Yfaille"], sample_results["Zfaille"], 'tab:red', alpha=0.1, linewidth=0.5)
@@ -424,51 +427,41 @@ def plot_results(trace):
     }
 
     try:
-        mean_results = compute_fault_and_axial_surfaces(params_mean,y_topo,z_topo,y_insar,z_insar)
+        mean_results = compute_fault_and_axial_surfaces(params_mean, y_topo, z_topo, y_insar, z_insar)
 
         # Tracer la faille moyenne en gras
         if "Yfaille" in mean_results and "Zfaille" in mean_results:
-            ax3.plot(mean_results["Yfaille"], mean_results["Zfaille"], color='tab:red', linewidth=1.5, label="Faille moyenne")
+            ax3.plot(mean_results["Yfaille"], mean_results["Zfaille"], color='tab:red', linewidth=1.5,
+                     label="Faille moyenne")
 
         # Tracer les surfaces axiales moyennes
         for i in range(1, n_samples):
             y_key = f"Y_asurf{i}"
             z_key = f"Z_asurf{i}"
             if y_key in mean_results and z_key in mean_results:
-                ax3.plot(mean_results[y_key], mean_results[z_key], 'k--', alpha=0.5, linewidth=0.8, label="Surfaces axiales" if i == 1 else "")
+                ax3.plot(mean_results[y_key], mean_results[z_key], 'k--', alpha=0.5, linewidth=0.8,
+                         label="Surfaces axiales" if i == 1 else "")
 
         # Tracer les charnières moyennes
         for i in range(1, n_samples):
             y_key = f"Ych{i}"
             z_key = f"Zch{i}"
             if y_key in mean_results and z_key in mean_results:
-                ax3.scatter(mean_results[y_key], mean_results[z_key], color='tab:red', s=20, label="Charnières" if i == 1 else "", alpha=0.5)
+                ax3.scatter(mean_results[y_key], mean_results[z_key], color='tab:red', s=20,
+                            label="Charnières" if i == 1 else "", alpha=0.5)
     except Exception as e:
         print(f"Erreur lors du calcul de la faille moyenne: {e}")
 
-    ax2.set_xlabel("Position sur le profil (m)")
-    ax2.set_ylabel("Profondeur (m)")
-    ax2.legend(loc="lower left")
-    ax2.set_title(f"Représentation de la faille à postériori avec {n_samples} réalisations")
-    ax2.grid(True, linestyle='--', alpha=0.5)
+    ax3.legend(loc="lower left")
+    realisations = cores * (nburn + niter)
+    ax3.set_title(f"Représentation de la faille à postériori avec {realisations} réalisations")
+    ax3.grid(True, linestyle='--', alpha=0.5)
 
-    # Lim topo
-    ax1.set_xlim(min(y_insar), max(y_insar))
-    ax1.set_ylim(min(z_topo) - 200, max(z_topo) + 200)
-    ax2.set_xlim(min(y_insar), max(y_insar))
-    ax2.set_ylim(min(z_topo) - 200, max(z_topo) + 200)
-    
-    # Lim déformations
-    ax1b.set_xlim(min(y_insar), max(y_insar))
-    ax1b.set_ylim(min(z_insar)-10, max(z_insar)+10)
-    ax2b.set_xlim(min(y_insar), max(y_insar))
-    ax2b.set_ylim(min(z_insar)-10, max(z_insar)+10)
+    # Limites des axes
+    for ax in [ax1, ax2, ax3]:
+        ax.set_xlim(min(y_insar), max(y_insar))
+        ax.invert_xaxis()
 
-    # fig 2
-    ax2.set_xlim(min(y_insar), max(y_insar))
-    ax1.invert_xaxis()
-    ax2.invert_xaxis()
-    ax3.invert_xaxis()
     fig.tight_layout(pad=1.0)
     plt.show()
 

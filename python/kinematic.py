@@ -1,15 +1,17 @@
 # -*- coding:utf-8 -*-
+# -*- coding:utf-8 -*-
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+
 
 def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
     # ============================================================================
     # PARAMETRES SETTING (identique au MATLAB)
     # ============================================================================
-    beta = np.deg2rad(params.get("beta",60))
+    beta = np.deg2rad(params.get("beta", 60))
     teta = np.deg2rad(params.get("teta", 50))
-    omega = np.deg2rad(params.get("omega",30))
+    omega = np.deg2rad(params.get("omega", 30))
 
     alpha = teta + ((beta - teta) / 2)
     coef = -1 / alpha
@@ -77,11 +79,11 @@ def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
     # ============================================================================
     # DEFINITION DES CHARNIERES
     # ============================================================================
-    def inter_ramp(x):   #####################A VOIR##########################
+    def inter_ramp(x):  #####################A VOIR##########################
         return ramp1(x) - ramp2(x)
 
     # Ycrois = fsolve(inter_ramp, 4593000)[0] sur matlab
-    Ycrois = (bramp2 - bramp1) / (aramp1 - aramp2) #####################A VOIR##########################
+    Ycrois = (bramp2 - bramp1) / (aramp1 - aramp2)  #####################A VOIR##########################
     Zcrois = ramp1(Ycrois)
 
     # Calcul des rayons de courbure
@@ -111,26 +113,28 @@ def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
     abis = coef
     bbis = Zcentre - (abis * Ycentre)
 
-    def biss(x):                                 #####################A VOIR##########################
+    def biss(x):  #####################A VOIR##########################
         return abis * x + bbis
 
     abis2 = coef2
     bbis2 = Zcentre2 - (abis2 * Ycentre2)
 
-    def biss2(x):                                   #####################A VOIR##########################
+    def biss2(x):  #####################A VOIR##########################
         return abis2 * x + bbis2
 
     # Équation des cercles
     def Cercle(x):
-        return Zcentre - np.sqrt(np.maximum(0, -(x - Ycentre)**2 + Rc**2)) #####################A VOIR##########################
+        return Zcentre - np.sqrt(
+            np.maximum(0, -(x - Ycentre) ** 2 + Rc ** 2))  #####################A VOIR##########################
 
     def Cercle2(x):
-        return Zcentre2 - np.sqrt(np.maximum(0, -(x - Ycentre2)**2 + Rc2**2)) #####################A VOIR##########################
+        return Zcentre2 - np.sqrt(
+            np.maximum(0, -(x - Ycentre2) ** 2 + Rc2 ** 2))  #####################A VOIR##########################
 
     # Définition des coordonnées Y de la faille
     Yfaille = np.arange(Ymin, Ymax + 1, 1)
     taille = len(Yfaille)
-    Zfaille = np.zeros(taille)                  #####################A VOIR##########################
+    Zfaille = np.zeros(taille)  #####################A VOIR##########################
 
     # Calcul des coordonnées Z de la faille
     for l in range(taille):
@@ -196,17 +200,16 @@ def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
     Y_asurf3, Z_asurf3 = filter_z(Z_asurf3, Y_asurf3)
     Y_asurf4, Z_asurf4 = filter_z(Z_asurf4, Y_asurf4)
 
-    Zbis = biss(Yfaille)        #####################A VOIR##########################
+    Zbis = biss(Yfaille)  #####################A VOIR##########################
     # ============================================================================
     # LECTURE DES DONNEES TOPO ET INSAR
     # ============================================================================
-    #Y_topo = params.get("Z_topo", np.linspace(0, 20000, 1000))
-    #Z_topo = params.get("Z_topo", np.linspace(0, 20000, 1000))
-    #Y_insar = params.get("Z_insar", np.linspace(0, 20000, 1000))
-    #Z_insar = params.get("Z_insar", np.linspace(0, 20000, 1000))
+    # Y_topo = params.get("Z_topo", np.linspace(0, 20000, 1000))
+    # Z_topo = params.get("Z_topo", np.linspace(0, 20000, 1000))
+    # Y_insar = params.get("Z_insar", np.linspace(0, 20000, 1000))
+    # Z_insar = params.get("Z_insar", np.linspace(0, 20000, 1000))
     Y_insar = np.max(Y_insar) - Y_insar
     Y_topo = np.max(Y_topo) - Y_topo
-
 
     # ============================================================================
     # DEFOMRATION DES STRATES
@@ -215,12 +218,12 @@ def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
     n_tot = params.get("n_tot", 1)
     deltaS = Smax / n_tot
 
-    G_Y0 = np.linspace(0, 30000, di + 1)   #####################A VOIR##########################
+    G_Y0 = np.linspace(0, 30000, di + 1)  #####################A VOIR##########################
     G_Z0 = np.zeros(di + 1) + 3307
 
-    Y_save = np.zeros_like(G_Y0) #####################A VOIR##########################
+    Y_save = np.zeros_like(G_Y0)  #####################A VOIR##########################
     Z_save = np.zeros_like(G_Z0)
-    Y_init = G_Y0.copy()
+    Y_initial = G_Y0.copy()
     deltaZ_char2 = Rc * np.cos(teta)
     deltaY_char2 = Rc * np.sin(teta)
 
@@ -269,7 +272,8 @@ def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
                     deltaY = hypote * np.cos(jela)
                     Y[l] = Y[l] + deltaY + (hypo * np.cos(omega)) + (c * np.cos(teta))
                     Z[l] = Z[l] + deltaZ + (hypo * np.sin(omega)) + (c * np.sin(teta))
-                elif S > (hypo + (Rc2 * (teta - omega)) + hyp3) and S < (hypo + (Rc2 * (teta - omega)) + hyp3 + (Rc * (beta - teta))):
+                elif S > (hypo + (Rc2 * (teta - omega)) + hyp3) and S < (
+                        hypo + (Rc2 * (teta - omega)) + hyp3 + (Rc * (beta - teta))):
                     c = S - hypo - (Rc2 * (teta - omega)) - hyp3
                     hypote = 2 * Rc2 * np.sin((teta - omega) / 2)
                     jela = ((teta - omega) / 2) + omega
@@ -291,8 +295,10 @@ def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
                     jela2 = ((beta - teta) / 2) + teta
                     deltaZ2 = hypote2 * np.sin(jela2)
                     deltaY2 = hypote2 * np.cos(jela2)
-                    Y[l] = Y[l] + (hypo * np.cos(omega)) + deltaY1 + (hyp3 * np.cos(teta)) + deltaY2 + (c * np.cos(beta))
-                    Z[l] = Z[l] + (hypo * np.sin(omega)) + deltaZ1 + (hyp3 * np.sin(teta)) + deltaZ2 + (c * np.sin(beta))
+                    Y[l] = Y[l] + (hypo * np.cos(omega)) + deltaY1 + (hyp3 * np.cos(teta)) + deltaY2 + (
+                                c * np.cos(beta))
+                    Z[l] = Z[l] + (hypo * np.sin(omega)) + deltaZ1 + (hyp3 * np.sin(teta)) + deltaZ2 + (
+                                c * np.sin(beta))
 
             # ZONE DANS LA PREMIERE CHARNIERE
             elif Z[l] > Asurf4(Y[l]) and Z[l] < Asurf3(Y[l]):
@@ -304,7 +310,7 @@ def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
                 sol_Z = Zc[indice]
                 dey1 = np.abs(sol_Y - Y[l])
                 dez1 = np.abs(sol_Z - Z[l])
-                Rc2test2 = np.sqrt(dez1**2 + dey1**2)
+                Rc2test2 = np.sqrt(dez1 ** 2 + dey1 ** 2)
                 phi3 = np.arctan2(dey1, dez1)
                 if Y[l] < sol_Y:
                     dist = Rc2 * (teta + phi3)
@@ -323,7 +329,7 @@ def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
                 b_ramp_int = Zinta - aramp2 * Yinta
                 Yinta2 = (b_ramp_int - b_surf2) / (coef - aramp2)
                 Zinta2 = aramp2 * Yinta2 + b_ramp_int
-                hyp3 = np.sqrt((Zinta2 - Zinta)**2 + (Yinta2 - Yinta)**2)
+                hyp3 = np.sqrt((Zinta2 - Zinta) ** 2 + (Yinta2 - Yinta) ** 2)
                 dist_int = dist + hyp3
                 dist_tot = dist + hyp3 + Rc * (beta - teta)
 
@@ -364,7 +370,7 @@ def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
 
             # ZONE ENTRE LES DEUX CHARNIERES
             elif Z[l] > Asurf3(Y[l]) and Z[l] < Asurf2(Y[l]):
-                Hyp = np.sqrt(((Ypoint[l] - Y[l])**2) + ((Zpoint[l] - Z[l])**2))
+                Hyp = np.sqrt(((Ypoint[l] - Y[l]) ** 2) + ((Zpoint[l] - Z[l]) ** 2))
                 if S < Hyp:
                     Y[l] = Y[l] + (S * np.cos(teta))
                     Z[l] = Z[l] + (S * np.sin(teta))
@@ -393,7 +399,7 @@ def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
                 Cint_Z = sol_Z
                 dez = np.abs(Cint_Z - Z[l])
                 dey = np.abs(Cint_Y - Y[l])
-                Rctest = np.sqrt(dez**2 + dey**2)
+                Rctest = np.sqrt(dez ** 2 + dey ** 2)
                 phi3 = np.arctan2(dey, dez)
                 hypo = Rc * (beta - phi3)
 
@@ -421,9 +427,8 @@ def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
             mask = (Y.copy() < Y_faille) & (Z.copy() < Y_faille)
             Y_save = Y.copy()[mask]
             Z_save = Z.copy()[mask]
-            Y_short = Y_init[mask] - Y_save
-			
-		
+            raccourcissement_horiz = Y_initial[mask] - Y_save
+
         S += deltaS
 
     return {
@@ -439,7 +444,7 @@ def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
         "Z_asurf4": Z_asurf4,
         "Y_save": Y_save,
         "Z_save": Z_save,
-        "Y_short": Y_short,
+        "raccourcissement_horiz": raccourcissement_horiz,
         "Y_topo": Y_topo,
         "Z_topo": Z_topo,
         "Y_insar": Y_insar,
@@ -469,6 +474,8 @@ def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
         "dj": dj,
         "ite_s": ite_s
     }
+
+
 if __name__ == "__main__":
     params = {
         "beta": 32,  # Faille raide
@@ -509,7 +516,7 @@ if __name__ == "__main__":
     ax1b = ax1.twinx()
 
     ax1.plot(results["Y_topo"], results["Z_topo"], linewidth=1, alpha=1, label="Median", color='black')
-    ax1b.plot(results["Y_insar"] , results["Z_insar"], linewidth=1, alpha=0.7, label="Median")
+    ax1b.plot(results["Y_insar"], results["Z_insar"], linewidth=1, alpha=0.7, label="Median")
     ax1b.set_ylabel("Velocity", color='r')
 
     ax1b.plot(results["Y_save"], results["Z_save"] - 3307, '-b', label='Déformation calculée')
