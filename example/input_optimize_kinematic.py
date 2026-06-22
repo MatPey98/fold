@@ -12,8 +12,8 @@ nbins = 50               # Interpolation step for the InSAR median
 # ======================================================================================================================
 # MCMC parameters
 # ======================================================================================================================
-niter = 1000  # Total number of iterations
-nburn = 800   # Number of burn-in iterations
+niter = 100  # Total number of iterations
+nburn = 80   # Number of burn-in iterations
 n_samples = 4  # Number of posterior draws to display
 chains = 4     # Number of MCMC chains
 cores = 8      # Number of CPU cores used
@@ -21,14 +21,13 @@ cores = 8      # Number of CPU cores used
 # ======================================================================================================================
 # Prior parameters: U = Uniform[lower, upper]  or  N = Normal[mu, sigma]
 # ======================================================================================================================
-Ubeta  = [30, 50]         # Uniform prior on fault dip angle beta (degrees)
+Ubeta  = [30, 89]         # Uniform prior on fault dip angle beta (degrees)
 Uteta  = [7.5, 29]        # Uniform prior on fault dip angle teta (degrees)
 Uomega = [1, 7]           # Uniform prior on omega parameter
-# NY_r2 = [16000, 2000]   # (commented out) Normal prior on Y_r2
 UY_r2  = [11000, 17000]   # Uniform prior on ramp position Y_r2 (m)
 UY_r3  = [1000, 10000]    # Uniform prior on ramp position Y_r3 (m)
-UW     = [1000, 4000]     # Uniform prior on fault width W (m)
-UW2    = [1000, 4000]     # Uniform prior on second fault width W2 (m)
+UW     = [1000, 20000]     # Uniform prior on fault width W (m)
+UW2    = [1000, 20000]     # Uniform prior on second fault width W2 (m)
 USmax  = [10, 200]        # Uniform prior on maximum slip Smax (mm)
 
 # ======================================================================================================================
@@ -38,7 +37,6 @@ Y_faille = 18520   # Surface trace of the fault — along-profile position (m)
 Z_faille = 3430    # Surface trace of the fault — elevation (m)
 Ymin     = 1000    # Fault computation start position (m)
 Ymax     = 17800   # Fault computation end position (m)
-Ymax2    = 14000   # Second fault computation end position (m)
 di       = 4000    # Layer thickness (m)
 n_tot    = 1       # Total number of models
 
