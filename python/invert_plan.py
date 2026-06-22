@@ -44,7 +44,8 @@ if len(sys.argv) > 1:
         print(f"Reading input file: {fname}")
         try:
             sys.path.append(path.dirname(path.abspath(fname)))
-            exec("from " + path.basename(fname) + " import *")
+            modname = path.splitext(path.basename(fname))[0]
+            exec(f"from {modname} import *")
         except:
             exec(open(fname).read())
     except Exception as e:
@@ -86,17 +87,23 @@ abscisses = np.max(profile.abscisse) - profile.abscisse
 xmin, xmax = abscisses[0], abscisses[-1]
 
 # ======================================================================================================================
-# InSAR — vertical velocity fields
+# InSAR — load datasets defined in the input file
+#
+# Input file must define lists of (filename, label) tuples, e.g.:
+#   insar_verticals   = [("vertical_2003-2011.tif",   "2003–2011")]
+#   insar_shortenings = [("shortening_2003-2011.tif", "2003–2011")]
 # ======================================================================================================================
-verti_0311 = _load_insar(insar_vertical_0311, chemin_insar, profile, width)
-verti_1119 = _load_insar(insar_vertical_1119, chemin_insar, profile, width)
-verti_0319 = _load_insar(insar_vertical_0319, chemin_insar, profile, width)
-los_co2004 = _load_insar(insar_LOS_co2004,    chemin_insar, profile, width)
 
-# InSAR — horizontal shortening
-short_0311 = _load_insar(insar_short_0311, chemin_insar, profile, width)
-short_1119 = _load_insar(insar_short_1119, chemin_insar, profile, width)
-short_0319 = _load_insar(insar_short_0319, chemin_insar, profile, width)
+_COLORS = ["dodgerblue", "coral", "darkseagreen", "mediumpurple", "goldenrod", "teal"]
+_nbins  = globals().get('nbins', 120)
+
+_insar_verticals   = globals().get('insar_verticals',   [])
+_insar_shortenings = globals().get('insar_shortenings', [])
+
+vertical_results   = [(r, label) for (fname, label) in _insar_verticals
+                      for r in [_load_insar(fname, chemin_insar, profile, width, _nbins)]]
+shortening_results = [(r, label) for (fname, label) in _insar_shortenings
+                      for r in [_load_insar(fname, chemin_insar, profile, width, _nbins)]]
 
 # ======================================================================================================================
 # Topography (DEM)
@@ -159,40 +166,30 @@ ax1.tick_params(axis='y', labelcolor='k')
 ax1b = ax1.twinx()
 
 # Vertical displacements
-_vertical_datasets = [
-    (verti_0311, "dodgerblue", "InSAR vertical displacement 2003–2011"),
-    (verti_1119, "coral",      "InSAR vertical displacement 2011–2019"),
-    (verti_0319, "darkseagreen","InSAR vertical displacement 2003–2019"),
-]
-for result, color, label in _vertical_datasets:
+for i, (result, label) in enumerate(vertical_results):
     if result is not None:
         _, _, centers, median, std = result
-        ax1b.plot(centers, median, color=color, linewidth=2, label=label)
-        ax1b.fill_between(centers, median - std, median + std, color=color, alpha=0.2)
-
-# Co-seismic 2004
-if los_co2004 is not None:
-    _, _, centers, median, std = los_co2004
-    ax1b.plot(centers, median, color="red", linewidth=2, label="InSAR co-seismic 2004")
-    ax1b.fill_between(centers, median - std, median + std, color="red", alpha=0.2)
+        color = _COLORS[i % len(_COLORS)]
+        ax1b.plot(centers, median, color=color, linewidth=2,
+                  label=f"Vertical {label}")
+        ax1b.fill_between(centers, median - std, median + std,
+                          color=color, alpha=0.2)
 
 # Horizontal shortening
-_short_datasets = [
-    (short_0311, "dodgerblue",  "InSAR horizontal shortening 2003–2011"),
-    (short_1119, "coral",       "InSAR horizontal shortening 2011–2019"),
-    (short_0319, "darkseagreen","InSAR horizontal shortening 2003–2019"),
-]
-for result, color, label in _short_datasets:
+for i, (result, label) in enumerate(shortening_results):
     if result is not None:
         _, _, centers, median, std = result
-        ax1b.plot(centers, median, color=color, linewidth=2, label=label)
-        ax1b.fill_between(centers, median - std, median + std, color=color, alpha=0.2)
+        color = _COLORS[i % len(_COLORS)]
+        ax1b.plot(centers, median, color=color, linewidth=2, linestyle='--',
+                  label=f"Shortening {label}")
+        ax1b.fill_between(centers, median - std, median + std,
+                          color=color, alpha=0.2)
 
 ax1b.set_ylabel("Velocity (mm/yr)", color='r')
 ax1b.set_xlim(xmin, xmax)
 
 # Set ylim from the first available shortening dataset
-for result in (short_0319, short_0311, short_1119):
+for result, _ in shortening_results:
     if result is not None:
         _, velocities, *_ = result
         ax1b.set_ylim(np.nanmin(velocities) - 10, np.nanmax(velocities) + 10)
@@ -236,8 +233,8 @@ ax2.set_xlim(xmin, xmax)
 # ======================================================================================================================
 output_dir = globals().get('output_dir', '.')
 os.makedirs(output_dir, exist_ok=True)
-output_path = os.path.join(output_dir, "cross_section.png")
-fig.savefig(output_path, dpi=300, bbox_inches='tight')
+output_path = os.path.join(output_dir, "cross_section.pdf")
+fig.savefig(output_path, bbox_inches='tight')
 print(f"Figure saved to: {output_path}")
 
 plt.show()

@@ -77,17 +77,24 @@ python ./fold/python/invert_plan.py ./work/fold/input_invert_plan.py
 
 #### InSAR datasets (all optional)
 
-Each variable is a raster filename; all loaded from `chemin_insar`.
+Datasets are defined as lists of `(filename, label)` tuples; all files are loaded from `chemin_insar`. Add, remove, or comment out entries to control which datasets appear on the plot. Colors are assigned automatically. Vertical profiles are drawn as solid lines, shortening profiles as dashed lines.
+
+```python
+insar_verticals = [
+    ("vertical_2003-2011_mm_crop03_UTM.tif", "2003–2011"),
+    ("vertical_2014-2019_mm_crop03_UTM.tif", "2014–2019"),  # comment out to hide
+]
+
+insar_shortenings = [
+    ("shortening_2003-2011_mm_crop03_UTM.tif", "2003–2011"),
+]
+```
 
 | Variable | Description |
 |----------|-------------|
-| `insar_vertical_0311` | Vertical velocity 2003–2011 (mm/yr) |
-| `insar_vertical_1119` | Vertical velocity 2011–2019 (mm/yr) |
-| `insar_vertical_0319` | Vertical velocity 2003–2019 (mm/yr) |
-| `insar_LOS_co2004` | Co-seismic LOS 2004 |
-| `insar_short_0311` | Horizontal shortening 2003–2011 (mm/yr) |
-| `insar_short_1119` | Horizontal shortening 2011–2019 (mm/yr) |
-| `insar_short_0319` | Horizontal shortening 2003–2019 (mm/yr) |
+| `insar_verticals` | List of `(filename, label)` — vertical velocity rasters (mm/yr) |
+| `insar_shortenings` | List of `(filename, label)` — horizontal shortening rasters (mm/yr) |
+| `chemin_insar` | Path to the InSAR raster directory |
 
 #### DEM and dip measurements
 
