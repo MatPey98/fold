@@ -24,23 +24,23 @@ class Insar:
 
         for row in range(rows):
             for col in range(cols):
+                value = band[row, col]
+                # Skip invalid pixels before computing coordinates (faster)
+                if np.isnan(value) or not np.isfinite(value) or value >= 1e10:
+                    continue
                 x, y = self.raster.xy(row, col)
                 proj = self.profile.get_projection((x, y), width)
-
                 if proj is not None:
                     xpp, ypp = proj
-                    value = band[row, col]
-
-                    if not np.isnan(value) and np.isfinite(value) and value<1e10:
-                        abscisses_insar.append(xpp)
-                        velocities.append(value)
+                    abscisses_insar.append(xpp)
+                    velocities.append(value)
 
         return np.array(abscisses_insar), np.array(velocities)
 
     def insar_statistics(self, width, nbins=100):
         """
-        Calcule la médiane et l'écart-type des vitesses InSAR le long du profil.
-        Ignore les valeurs nulles, NaN, inf et -inf.
+        Computes median and standard deviation of InSAR velocities along the profile.
+        Ignores NaN, inf, -inf, and zero values.
         """
         abscisses_insar, velocities = self.projection_insar(width)
         xmin = 0
@@ -69,9 +69,12 @@ class MNT:
 
     def __init__(self, filename, filename_err, wdir):
         self.path = wdir + filename
-        self.path_err = wdir + filename_err
         self.raster = rasterio.open(self.path)
-        self.raster_err = rasterio.open(self.path_err)
+        # Error raster is optional — if None, elevations_err returns sigma=1
+        self.raster_err = None
+        if filename_err is not None:
+            self.path_err = wdir + filename_err
+            self.raster_err = rasterio.open(self.path_err)
 
     def elevations(self, coord):
         elevations = []
@@ -81,12 +84,14 @@ class MNT:
             try:
                 elevation = self.raster.read(1, window=window)[0, 0]
             except IndexError:
-                elevations.append("NaN")
+                elevations.append(np.nan)
                 continue
             elevations.append(elevation)
         return elevations
 
     def elevations_err(self, coord):
+        if self.raster_err is None:
+            return np.ones(len(coord))  # default sigma = 1
         elevations_err = []
         for pt in coord:
             lig, col = self.raster_err.index(pt[0], pt[1])
@@ -94,7 +99,7 @@ class MNT:
             try:
                 elevation = self.raster_err.read(1, window=window)[0, 0]
             except IndexError:
-                elevations_err.append("NaN")
+                elevations_err.append(np.nan)
                 continue
             elevations_err.append(elevation)
         return elevations_err
@@ -110,17 +115,15 @@ class Seismic:
 
     def __init__(self, filename, wdir, profile):
         """
-
         :param filename:
         :param wdir:
         """
         self.path = wdir + filename
         self.profile = profile
-        self.data = pd.read_csv(self.path, sep=r",") # si virgule
-        # self.data = self.data.dropna(subset=["latitude", "longitude", "depth", "mag"])
+        self.data = pd.read_csv(self.path, sep=r",")  # comma separator
 
-        ### coordinates change :
-        transformer = Transformer.from_crs("EPSG:4326", "EPSG:32647",always_xy=True)
+        # Coordinate conversion: geographic (WGS84) → UTM
+        transformer = Transformer.from_crs("EPSG:4326", "EPSG:32647", always_xy=True)
 
         east, north = transformer.transform(
             self.data["longitude"].values,
@@ -129,13 +132,12 @@ class Seismic:
         self.data["longitude"] = east
         self.data["latitude"] = north
 
-
     def projection_seismic(self, width_seismic):
 
         abscisses = []
         depths = []
         magnitudes = []
-        rms_list = []  # Nouvelle liste pour stocker les valeurs RMS
+        rms_list = []  # List to store RMS values
 
         for i in range(len(self.data)):
 
@@ -148,6 +150,6 @@ class Seismic:
                 abscisses.append(xpp)
                 depths.append(self.data["depth"][i])
                 magnitudes.append(self.data["mag"][i])
-                rms_list.append(self.data["rms"][i]*1000)  # Ajoutez la valeur RMS
+                rms_list.append(self.data["rms"][i] * 1000)  # Append RMS value
 
         return abscisses, depths, magnitudes, rms_list
