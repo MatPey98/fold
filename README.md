@@ -5,6 +5,7 @@ Bayesian inversion of a fault-bend fold using InSAR surface velocity fields and 
 **Recommended workflow:**
 1. `invert_plan.py` — visualize all available data on the profile and measure fault/strata dip from the DEM to constrain the priors
 2. `optimize_kinematic.py` — run the Bayesian inversion using priors informed by step 1
+3. `plot_histo.py` — plot posterior histograms from the trace files saved by step 2
 
 ---
 
@@ -15,6 +16,7 @@ fold/
 ├── python/
 │   ├── invert_plan.py          # Step 1: data visualization + dip inversion from DEM
 │   ├── optimize_kinematic.py   # Step 2: Bayesian MCMC inversion
+│   ├── plot_histo.py           # Step 3: posterior histogram plots from trace files
 │   ├── kinematic.py            # Forward model: tri-ramp fault geometry + kink-band kinematics
 │   ├── dip.py                  # Dip class: plane fitting + projection onto profile
 │   ├── read_data.py            # I/O classes: Insar, MNT, Seismic
@@ -100,9 +102,10 @@ insar_shortenings = [
 
 | Parameter | Description |
 |-----------|-------------|
-| `mnt` | DEM raster filename |
+| `mnt` | High-resolution DEM raster — used for dip plane fitting (strata and fault) |
+| `mnt_figure` | Low-resolution DEM raster — **optional**, used only for the topography profile display; falls back to `mnt` if omitted |
 | `mnt_err` | DEM uncertainty raster — **optional**, defaults to σ = 1 if omitted |
-| `chemin_mnt` | Path to DEM rasters |
+| `chemin_mnt` | Path to DEM rasters (applies to both `mnt` and `mnt_figure`) |
 | `chemin_pendages` | Directory containing strata dip shapefiles (one .shp per measurement) |
 | `chemin_fault` | Directory containing fault dip shapefiles |
 | `length_dip` | Length of strata dip segments on the plot (m) |
@@ -206,13 +209,44 @@ Constraint enforced: β > θ > ω (geometrically required).
 
 The likelihood assumes independent Gaussian noise: σ = 10 mm (vertical) and σ = 50 mm (horizontal).
 
-### Output plots
+### Output files
 
-- Trace plots — MCMC chain evolution per parameter
-- Posterior histograms and corner plot (pairwise correlations)
-- Forest plots — 95% HDI intervals
-- Model fit — predicted vs. observed displacement profiles
-- Fault geometry — posterior fault trace and axial surface realizations
+All figures are saved as PDF to `output_dir` (configurable in the input file).
+
+| File | Description |
+|------|-------------|
+| `trace.pdf` | MCMC chain evolution per parameter |
+| `posterior.pdf` | Posterior histograms |
+| `corner.pdf` | Pairwise parameter correlations (hexbin) |
+| `forest_angles.pdf` | 95% HDI intervals for β, θ, ω, Smax |
+| `forest_geometry.pdf` | 95% HDI intervals for Y_r2, Y_r3, W, W2 |
+| `model_fit.pdf` | Predicted vs. observed displacement profiles + posterior fault geometry |
+| `traces/<param>.txt` | Raw posterior samples per parameter (all chains concatenated, one value per line) |
+
+---
+
+## Step 3 — Posterior histogram plots (`plot_histo.py`)
+
+Reads the trace text files saved by `optimize_kinematic.py` and produces publication-ready histogram figures with mean and 95% HDI for each parameter.
+
+**Usage:**
+```bash
+python3 fold/python/plot_histo.py <traces_dir> [output_dir]
+```
+
+Example:
+```bash
+python3 fold/python/plot_histo.py work/fold/output/traces/ work/fold/output/
+```
+
+**Output:**
+
+| File | Description |
+|------|-------------|
+| `posterior_histo.pdf` | 4×2 grid — one subplot per parameter with histogram, mean, 95% HDI |
+| `posterior_dip_angles.pdf` | Dip angles β, θ, ω overlaid for direct comparison |
+
+The seismic catalogue supports mixed date formats (USGS, Sun2012, Zha2013). Missing RMS values default to 1 km.
 
 ---
 
