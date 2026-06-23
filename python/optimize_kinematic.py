@@ -8,6 +8,7 @@ import warnings
 import pytensor
 import pytensor.tensor as pt
 import sys
+import os
 from os import path
 import getopt
 
@@ -52,6 +53,11 @@ if len(sys.argv) > 1:
     except Exception as e:
         print('Problem in input file')
         sys.exit()
+
+# Output directory (maindir must be set in the input file, e.g. maindir='/path/to/work/')
+output_dir = os.path.join(globals().get('wdir', '.'), 'output')
+os.makedirs(output_dir, exist_ok=True)
+print(f"Output directory: {output_dir}")
 
 # ======================================================================================================================
 # DATA LOADING
@@ -210,10 +216,7 @@ def plot_results(trace):
     # Parameter summary
     var_names = ["beta", "teta", "omega", "Y_r2", "Y_r3", "W", "W2", "Smax"]
 
-    # Filter NaN values
-    filtered_trace = {k: v for k, v in trace.posterior.items() if not np.any(np.isnan(v))}
-
-    summary = az.summary(filtered_trace, var_names=var_names)
+    summary = az.summary(trace, var_names=var_names)
     print("\nPosterior parameter summary:")
     print(summary)
 
@@ -221,14 +224,23 @@ def plot_results(trace):
     plt.rcParams.update({'font.size': 6})
     try:
         az.plot_trace(trace, var_names=var_names, compact=True, figsize=(5, 3), combined=True)
+        plt.gcf().savefig(os.path.join(output_dir, 'trace.pdf'), bbox_inches='tight')
+
         az.plot_posterior(trace, var_names=var_names, kind='hist', textsize=6, figsize=(5, 3))
+        plt.gcf().savefig(os.path.join(output_dir, 'posterior.pdf'), bbox_inches='tight')
+
         az.plot_pair(trace, var_names=var_names, kind='hexbin', marginals=True, textsize=6, figsize=(5, 3))
+        plt.gcf().savefig(os.path.join(output_dir, 'corner.pdf'), bbox_inches='tight')
+
         az.plot_forest(trace, var_names=["beta", "teta", "omega", "Smax"], combined=True, hdi_prob=0.95, textsize=6,
                        linewidth=1, markersize=2, figsize=(5, 3))
+        plt.gcf().savefig(os.path.join(output_dir, 'forest_angles.pdf'), bbox_inches='tight')
+
         az.plot_forest(trace, var_names=["Y_r2", "Y_r3", "W", "W2"], combined=True, hdi_prob=0.95, textsize=6,
                        linewidth=1, markersize=2, figsize=(5, 3))
-    except:
-        print("arviz shut down")
+        plt.gcf().savefig(os.path.join(output_dir, 'forest_geometry.pdf'), bbox_inches='tight')
+    except Exception as e:
+        print(f"Warning: arviz plotting failed ({e})")
 
     # Model figure formatting ------------------------------------------------------------------------------------------
     plt.rcParams.update({
@@ -387,7 +399,30 @@ def plot_results(trace):
         ax.invert_xaxis()
 
     fig.tight_layout(pad=1.0)
+    fig.savefig(os.path.join(output_dir, 'model_fit.pdf'), bbox_inches='tight')
+    print(f"Figures saved to: {output_dir}")
     plt.show()
+
+# ======================================================================================================================
+# SAVE TRACES
+# ======================================================================================================================
+def save_traces(trace):
+    """Save all posterior samples to text files (one file per parameter).
+
+    Files are written to output_dir/traces/. Each file contains all chains
+    concatenated (flattened), one value per line.
+    """
+    var_names = ["beta", "teta", "omega", "Y_r2", "Y_r3", "W", "W2", "Smax"]
+    traces_dir = os.path.join(output_dir, 'traces')
+    os.makedirs(traces_dir, exist_ok=True)
+    for var in var_names:
+        samples = trace.posterior[var].values.flatten()
+        fname = os.path.join(traces_dir, f'{var}.txt')
+        np.savetxt(fname, samples, fmt='%.6f')
+        print(f"  Saved {var:8s} → {fname}")
+    print(f"Traces saved to: {traces_dir}")
+    return traces_dir
+
 
 # ======================================================================================================================
 # MAIN EXECUTION
@@ -398,4 +433,5 @@ if __name__ == "__main__":
     print("###################################################################")
     print("\nStarting Bayesian inference:")
     model, trace = run_inversion()
+    save_traces(trace)
     plot_results(trace)

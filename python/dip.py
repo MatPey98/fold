@@ -130,6 +130,7 @@ class Dip:
         azimuth_deg = math.degrees(math.atan2(-a, -b))
         if azimuth_deg < 0:
             azimuth_deg += 360
+        print(f"strike: {azimuth_deg:.1f}°")
         self.azimuth = azimuth_deg
         return azimuth_deg
 

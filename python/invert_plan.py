@@ -107,14 +107,27 @@ shortening_results = [(r, label) for (fname, label) in _insar_shortenings
 
 # ======================================================================================================================
 # Topography (DEM)
+#
+# mnt         — high-resolution DEM used for dip plane fitting (required)
+# mnt_figure  — optional low-resolution DEM used only for the topography profile
+#               display; falls back to mnt if not defined
 # ======================================================================================================================
-elevations = None
+elevations   = None
+topodata     = None   # high-res DEM used for dip computations
+_mnt_err     = globals().get('mnt_err',    None)
+_mnt_figure  = globals().get('mnt_figure', None)
+
 try:
-    _mnt_err  = globals().get('mnt_err', None)  # optional — defaults to sigma=1
-    topodata  = MNT(mnt, _mnt_err, chemin_mnt)
-    elevations = topodata.elevations(profile.points)
+    topodata = MNT(mnt, _mnt_err, chemin_mnt)
 except Exception as e:
-    print(f"Warning: No elevation data ({e})")
+    print(f"Warning: Could not load high-res DEM ({e})")
+
+try:
+    _topo_display = MNT(_mnt_figure, None, chemin_mnt) if _mnt_figure else topodata
+    if _topo_display is not None:
+        elevations = _topo_display.elevations(profile.points)
+except Exception as e:
+    print(f"Warning: No elevation data for display ({e})")
 
 # ======================================================================================================================
 # Strata dip measurements
@@ -137,10 +150,11 @@ except Exception as e:
 # ======================================================================================================================
 # Seismic catalogue
 # ======================================================================================================================
-abs_seismic = prof_seismic = mag = rms_values = None
+abs_seismic = prof_seismic = mag = rms_values = times_seismic = None
 try:
     seismic_data = Seismic(seismic, chemin_seismic, profile)
-    abs_seismic, prof_seismic, mag, rms_values = seismic_data.projection_seismic(width_seismic)
+    abs_seismic, prof_seismic, mag, rms_values, times_seismic = \
+        seismic_data.projection_seismic(width_seismic)
     abs_seismic = np.max(abs_seismic) - abs_seismic
 except Exception as e:
     print(f"Warning: No seismic data ({e})")
@@ -185,7 +199,7 @@ for i, (result, label) in enumerate(shortening_results):
         ax1b.fill_between(centers, median - std, median + std,
                           color=color, alpha=0.2)
 
-ax1b.set_ylabel("Velocity (mm/yr)", color='r')
+ax1b.set_ylabel("Displacements (mm)", color='k')
 ax1b.set_xlim(xmin, xmax)
 
 # Set ylim from the first available shortening dataset
@@ -214,14 +228,36 @@ if dip_fault is not None and elevations is not None:
 
 # Seismic catalogue
 if abs_seismic is not None:
-    sizes = 50 + 150 * (mag - np.min(mag)) / (np.max(mag) - np.min(mag))
-    sc2 = ax2.scatter(abs_seismic, -np.array(prof_seismic) * 1000 + 4000,
-                      c=mag, cmap="YlOrRd", edgecolor="k", s=sizes)
-    ax2.errorbar(abs_seismic, -np.array(prof_seismic) * 1000 + 4000,
-                 xerr=2000, yerr=2000, fmt='none', ecolor='k', capsize=3)
+    mag      = np.array(mag)
+    rms_vals = np.array(rms_values)    # metres
+    times_yr = np.array(times_seismic) # decimal years
+    depths_m = -np.array(prof_seismic) * 1000 + 4000
+
+    # Point size proportional to magnitude (area ∝ M)
+    mag_min, mag_max = mag.min(), mag.max()
+    sizes = 20 + 200 * ((mag - mag_min) / (mag_max - mag_min + 1e-9)) ** 2
+
+    # Color = time (decimal year)
+    sc2 = ax2.scatter(abs_seismic, depths_m,
+                      c=times_yr, cmap="plasma",
+                      edgecolor="k", linewidths=0.4,
+                      s=sizes, zorder=3)
+
+    # Error bars = RMS location uncertainty
+    ax2.errorbar(abs_seismic, depths_m,
+                 xerr=rms_vals, yerr=rms_vals,
+                 fmt='none', ecolor='gray', alpha=0.5, capsize=2, zorder=2)
+
     cax  = inset_axes(ax2, width="3%", height="30%", loc="lower left", borderpad=1)
     cbar = fig.colorbar(sc2, cax=cax)
-    cbar.set_label("Magnitude")
+    cbar.set_label("Year")
+
+    # Legend for magnitudes
+    for m_leg in np.linspace(mag_min, mag_max, 3):
+        s_leg = 20 + 200 * ((m_leg - mag_min) / (mag_max - mag_min + 1e-9)) ** 2
+        ax2.scatter([], [], s=s_leg, color='gray', edgecolor='k',
+                    linewidths=0.4, label=f"M {m_leg:.1f}")
+    ax2.legend(loc="upper right", title="Magnitude", fontsize=7, title_fontsize=7)
 
 ax2.legend(loc="upper right")
 ax2.grid(True)
