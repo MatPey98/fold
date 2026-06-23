@@ -155,6 +155,8 @@ try:
     seismic_data = Seismic(seismic, chemin_seismic, profile)
     abs_seismic, prof_seismic, mag, rms_values, times_seismic = \
         seismic_data.projection_seismic(width_seismic)
+    if len(abs_seismic) == 0:
+        raise ValueError("no seismic events projected onto profile")
     abs_seismic = np.max(abs_seismic) - abs_seismic
 except Exception as e:
     print(f"Warning: No seismic data ({e})")
@@ -227,7 +229,7 @@ if dip_fault is not None and elevations is not None:
     dip_fault.plot_all_fault(topodata, profile, length_dip_fault, ax2)
 
 # Seismic catalogue
-if abs_seismic is not None:
+if abs_seismic is not None and len(abs_seismic) > 0:
     mag      = np.array(mag)
     rms_vals = np.array(rms_values)    # metres
     times_yr = np.array(times_seismic) # decimal years

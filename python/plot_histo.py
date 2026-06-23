@@ -56,7 +56,7 @@ def plot_histo(samples, label, ax, hdi_prob=0.95, bins=30, color='steelblue'):
                label=f"{int(hdi_prob*100)}% HDI: [{hdi[0]:.3g}, {hdi[1]:.3g}]")
 
     ax.set_title(f"{label}\n{mean:.3g}  [{hdi[0]:.3g} – {hdi[1]:.3g}]", fontsize=8)
-    ax.legend(fontsize=6, loc='best')
+    # ax.legend(fontsize=6, loc='best')
     ax.tick_params(labelsize=7)
 
 

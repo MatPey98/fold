@@ -54,8 +54,8 @@ if len(sys.argv) > 1:
         print('Problem in input file')
         sys.exit()
 
-# Output directory (maindir must be set in the input file, e.g. maindir='/path/to/work/')
-output_dir = os.path.join(globals().get('wdir', '.'), 'output')
+# Output directory — use output_dir from input file if defined, else wdir/output
+output_dir = globals().get('output_dir', os.path.join(globals().get('wdir', '.'), 'output'))
 os.makedirs(output_dir, exist_ok=True)
 print(f"Output directory: {output_dir}")
 
