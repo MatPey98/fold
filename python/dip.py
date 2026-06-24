@@ -45,6 +45,7 @@ class Dip:
 
         for pt in file.geometry:
             x, y = pt.x, pt.y
+
             z   = mnt.elevations([[x, y]])[0]
             err = mnt.elevations_err([[x, y]])[0]
             points.append([x, y, z])
@@ -106,31 +107,37 @@ class Dip:
         b_samples = np.random.normal(b0, sigma_b, n)
         return a_samples, b_samples
 
-    def calculate_dip(self, a, b, c):
+    def calculate_dip(self, a, b, c=-1.):
         """
-        Computes the dip angle of the plane relative to horizontal.
+        Computes the true dip angle of the plane (0–90°).
 
         Parameters
         ----------
         a, b, c : float
-            Plane coefficients (z = a*x + b*y + c, note c = -1 in our convention).
+            Normal vector coefficients; for plane z = a*x + b*y + cst, c = -1.
+            dip = acos(c / sqrt(a² + b² + c²)), then mapped to [0°, 90°].
         """
         norm_n    = np.sqrt(a**2 + b**2 + c**2)
         theta_deg = np.degrees(np.arccos(c / norm_n))
         if theta_deg > 90:
-            theta_deg = 180 - theta_deg  # Avoid dip > 90° (sign flip)
-        print(f"dip: {theta_deg:.1f}°")
+            theta_deg = 180 - theta_deg
+        # print(f"dip: {theta_deg:.1f}°")
         self.dip = theta_deg
         return theta_deg
 
-    def calculate_azimuth(self, a, b):
+    def calculate_dip_direction(self, a, b):
         """
-        Computes the strike azimuth of the plane (0–360°).
+        Computes the dip direction of the plane (0–360°, from North CW).
+
+        atan2(a, b) gives the uphill direction (gradient of z = ax + by).
+        The dip direction (downhill) = uphill + 180°.
+        self.azimuth stores the uphill direction; project_dip adds 180° internally.
         """
-        azimuth_deg = math.degrees(math.atan2(-a, -b))
+        azimuth_deg = math.degrees(math.atan2(a, b))
         if azimuth_deg < 0:
             azimuth_deg += 360
-        print(f"strike: {azimuth_deg:.1f}°")
+        dip_dir_deg = (azimuth_deg + 180.) % 360.
+        print(f"  dip direction: {dip_dir_deg:.1f}°   dip: {self.dip:.1f}°")
         self.azimuth = azimuth_deg
         return azimuth_deg
 
@@ -142,14 +149,28 @@ class Dip:
         ----------
         profile : Profile
         """
-        phi = abs(profile.azimuth - self.azimuth) % 360
-        if phi > 180:
-            phi = 360 - phi
+        # dip direction (downhill) = uphill azimuth + 180°
+        dip_dir = (self.azimuth + 180.) % 360.
+        phi = abs(profile.azimuth - dip_dir) % 360.
+        if phi > 180.:
+            phi = 360. - phi
 
+        # Apparent dip formula: tan(α_app) = tan(α_true) * cos(φ)
+        # arctan returns values in (-90°, 90°)
         projected = np.degrees(
             np.arctan(np.tan(np.radians(self.dip)) * np.cos(np.radians(phi)))
         )
-        # Sign convention: dip toward the section is negative
+
+        # Sign convention for _plot_dip_segment, which plots (x,y)→(x-dx, y+dy)
+        # with dx = length*cos(dip), dy = length*sin(dip).
+        # We need sin(dip) < 0 so the segment always points DOWNWARD.
+        #
+        # cos(phi) > 0  (section roughly toward dip direction):
+        #   projected > 0  →  negate  →  angle ∈ (-90°,0°)  →  sin < 0  ✓
+        # cos(phi) < 0  (section roughly against dip direction):
+        #   projected < 0  →  180 - projected  →  angle ∈ (180°,270°)  →  sin < 0  ✓
+        # cos(phi) = 0  (section along strike):
+        #   projected = 0  →  no branch  →  horizontal segment  ✓
         if projected > 0:
             projected = -projected
         elif projected < 0:
@@ -199,15 +220,21 @@ class Dip:
         """
         for filename in self.items:
             # --- Mean dip ---
+            print(f"\n── {filename}")
             self.load_points(filename, topodata)
             self.compute_median_point()
             coefficients, sigmam = self.fit_plane()
             a, b, c = coefficients
 
             self.calculate_dip(a, b, -1)
-            self.calculate_azimuth(a, b)
-            self.project_dip(profile)
+            self.calculate_dip_direction(a, b)
+            true_dip = self.dip          # save true dip before projection
+            self.project_dip(profile)    # modifies self.dip → projected dip
+            projected_dip = self.dip
+            print(f"  pendage apparent = {projected_dip:.1f}°")
+            self.dip = true_dip          # restore true dip for find_intersection branch test
             self.find_intersection(profile)
+            self.dip = projected_dip     # restore projected dip for plotting
 
             proj = profile.get_projection_all(self.intersect[0])
             x    = np.max(profile.abscisse) - proj[0]
@@ -217,21 +244,28 @@ class Dip:
                 self._plot_dip_segment(length, x, y, ax, color=mean_color)
 
             # --- Monte Carlo uncertainty ---
-            a_samples, b_samples = self.propagate_uncertainties(coefficients, sigmam, n=20)
+            a_samples, b_samples = self.propagate_uncertainties(coefficients, sigmam, n=200)
 
+            dip_mc  = []
+            az_mc   = []
             for a_i, b_i in zip(a_samples, b_samples):
-                norm    = np.sqrt(a_i**2 + b_i**2 + 1)
-                dip_i   = np.degrees(np.arccos(1 / norm))
+                # same convention as calculate_dip / calculate_azimuth
+                norm_i = np.sqrt(a_i**2 + b_i**2 + 1.)
+                dip_i  = np.degrees(np.arccos(-1. / norm_i))
                 if dip_i > 90:
                     dip_i = 180 - dip_i
 
-                az_i = np.degrees(np.arctan2(-a_i, -b_i))
+                az_i = np.degrees(np.arctan2(a_i, b_i))
                 if az_i < 0:
                     az_i += 360
 
-                phi = abs(profile.azimuth - az_i) % 360
-                if phi > 180:
-                    phi = 360 - phi
+                dip_mc.append(dip_i)
+                az_mc.append(az_i)
+
+                dip_dir_i = (az_i + 180.) % 360.
+                phi = abs(profile.azimuth - dip_dir_i) % 360.
+                if phi > 180.:
+                    phi = 360. - phi
 
                 dip_proj = np.degrees(
                     np.arctan(np.tan(np.radians(dip_i)) * np.cos(np.radians(phi)))
@@ -257,6 +291,10 @@ class Dip:
                     dy = length * np.sin(np.radians(dip_proj))
                     ax.plot([x_mc, x_mc - dx], [y_mc, y_mc + dy],
                             color=mc_color, alpha=mc_alpha)
+
+            dip_mc = np.array(dip_mc)
+            az_mc  = np.array(az_mc)
+            print(f"  σ_dip = {np.std(dip_mc):.1f}°   σ_azimuth = {np.std(az_mc):.1f}°")
 
     # =========================================================================
     # Public plotting methods
