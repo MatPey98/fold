@@ -89,21 +89,20 @@ xmin, xmax = abscisses[0], abscisses[-1]
 # ======================================================================================================================
 # InSAR — load datasets defined in the input file
 #
-# Input file must define lists of (filename, label) tuples, e.g.:
-#   insar_verticals   = [("vertical_2003-2011.tif",   "2003–2011")]
-#   insar_shortenings = [("shortening_2003-2011.tif", "2003–2011")]
+# Input file must define a list of (filename, label) tuples, e.g.:
+#   insar = [
+#       ("vertical_2003-2019.tif",   "vertical 2003–2019"),
+#       ("shortening_2003-2019.tif", "shortening 2003–2019"),
+#   ]
 # ======================================================================================================================
 
 _COLORS = ["dodgerblue", "coral", "darkseagreen", "mediumpurple", "goldenrod", "teal"]
 _nbins  = globals().get('nbins', 120)
 
-_insar_verticals   = globals().get('insar_verticals',   [])
-_insar_shortenings = globals().get('insar_shortenings', [])
+_insar_list = globals().get('insar', [])
 
-vertical_results   = [(r, label) for (fname, label) in _insar_verticals
-                      for r in [_load_insar(fname, chemin_insar, profile, width, _nbins)]]
-shortening_results = [(r, label) for (fname, label) in _insar_shortenings
-                      for r in [_load_insar(fname, chemin_insar, profile, width, _nbins)]]
+insar_results = [(r, label) for (fname, label) in _insar_list
+                 for r in [_load_insar(fname, chemin_insar, profile, width, _nbins)]]
 
 # ======================================================================================================================
 # Topography (DEM)
@@ -206,35 +205,24 @@ ax1.tick_params(axis='y', labelcolor='k')
 
 ax1b = ax1.twinx()
 
-# Vertical displacements
-for i, (result, label) in enumerate(vertical_results):
+# InSAR datasets
+_all_velocities = []
+for i, (result, label) in enumerate(insar_results):
     if result is not None:
-        _, _, centers, median, std = result
+        _, velocities, centers, median, std = result
         color = _COLORS[i % len(_COLORS)]
-        ax1b.plot(centers, median, color=color, linewidth=2,
-                  label=f"Vertical {label}")
+        ax1b.plot(centers, median, color=color, linewidth=2, label=label)
         ax1b.fill_between(centers, median - std, median + std,
                           color=color, alpha=0.2)
-
-# Horizontal shortening
-for i, (result, label) in enumerate(shortening_results):
-    if result is not None:
-        _, _, centers, median, std = result
-        color = _COLORS[i % len(_COLORS)]
-        ax1b.plot(centers, median, color=color, linewidth=2, linestyle='--',
-                  label=f"Shortening {label}")
-        ax1b.fill_between(centers, median - std, median + std,
-                          color=color, alpha=0.2)
+        _all_velocities.append(velocities)
 
 ax1b.set_ylabel("Displacements (mm)", color='k')
 ax1b.set_xlim(xmin, xmax)
 
-# Set ylim from the first available shortening dataset
-for result, _ in shortening_results:
-    if result is not None:
-        _, velocities, *_ = result
-        ax1b.set_ylim(np.nanmin(velocities) - 10, np.nanmax(velocities) + 10)
-        break
+# ylim from all datasets combined
+if _all_velocities:
+    _v = np.concatenate(_all_velocities)
+    ax1b.set_ylim(np.nanmin(_v) - 10, np.nanmax(_v) + 10)
 
 ax1b.legend(loc="upper right", fontsize=7)
 
