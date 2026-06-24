@@ -217,12 +217,21 @@ class Dip:
         """
         Common logic for plotting mean dip + Monte Carlo uncertainty for all
         shapefiles in wdir. Used by plot_all_strata and plot_all_fault.
+
+        Only shapefiles whose median point lies within profile.w/2 of the
+        profile (perpendicular distance) are processed.
         """
         for filename in self.items:
             # --- Mean dip ---
             print(f"\n── {filename}")
             self.load_points(filename, topodata)
             self.compute_median_point()
+
+            # Width filter: skip if median point is too far from the profile
+            _, ypp = profile.get_projection_all([self.x, self.y])
+            if abs(ypp) > profile.w / 2:
+                print(f"  → skipped (perpendicular distance {abs(ypp):.0f} m > {profile.w/2:.0f} m)")
+                continue
             coefficients, sigmam = self.fit_plane()
             a, b, c = coefficients
 

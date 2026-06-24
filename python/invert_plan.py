@@ -122,10 +122,28 @@ try:
 except Exception as e:
     print(f"Warning: Could not load high-res DEM ({e})")
 
+elev_median = elev_std = None
 try:
     _topo_display = MNT(_mnt_figure, None, chemin_mnt) if _mnt_figure else topodata
     if _topo_display is not None:
-        elevations = _topo_display.elevations(profile.points)
+        # Sample elevations across the full width band (n_transverse cross-track samples)
+        # and compute median and std at each profile point.
+        _n_trans   = 15
+        _offsets   = np.linspace(-profile.w / 2, profile.w / 2, _n_trans)
+        _elev_med  = []
+        _elev_std  = []
+        for pt in profile.points:
+            row = []
+            for off in _offsets:
+                spt = [pt[0] + off * profile.n[0], pt[1] + off * profile.n[1]]
+                z = _topo_display.elevations([spt])[0]
+                if not np.isnan(z) and z != 0:
+                    row.append(z)
+            _elev_med.append(np.median(row) if row else np.nan)
+            _elev_std.append(np.std(row)   if row else np.nan)
+        elev_median = np.array(_elev_med)
+        elev_std    = np.array(_elev_std)
+        elevations  = elev_median   # keep for ylim computation below
 except Exception as e:
     print(f"Warning: No elevation data for display ({e})")
 
@@ -170,9 +188,16 @@ ax1 = fig.add_subplot(gs[0])
 ax2 = fig.add_subplot(gs[1])
 
 # ── Upper panel: topography + InSAR ──────────────────────────────────────────
-if elevations is not None:
-    ax1.plot(abscisses, elevations, color="black")
-    ax1.set_ylim(np.nanmin(elevations) - 200, np.nanmax(elevations) + 200)
+if elev_median is not None:
+    ax1.plot(abscisses, elev_median, color="black", lw=1)
+    if elev_std is not None:
+        ax1.fill_between(abscisses,
+                         elev_median - elev_std,
+                         elev_median + elev_std,
+                         color="gray", alpha=0.35, label="topo ±σ")
+    _elev_lo = np.nanmin(elev_median - (elev_std if elev_std is not None else 0))
+    _elev_hi = np.nanmax(elev_median + (elev_std if elev_std is not None else 0))
+    ax1.set_ylim(_elev_lo - 200, _elev_hi + 200)
 
 ax1.set_xlim(xmin, xmax)
 ax1.set_xlabel("Distance (m)")
