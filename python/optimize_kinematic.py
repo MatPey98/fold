@@ -1,5 +1,12 @@
 # !/usr/bin/env python3
 # -*- coding:utf-8 -*-
+import os
+# Disable pytensor C compilation — required when libpython is a static (.a) library
+# not compiled with -fPIC (common on servers). Falls back to numpy backend.
+os.environ.setdefault('PYTENSOR_FLAGS', 'cxx=')
+
+import matplotlib
+matplotlib.use('Agg')   # non-interactive backend — saves PDFs without opening windows
 import numpy as np
 import matplotlib.pyplot as plt
 import pymc as pm
@@ -400,8 +407,8 @@ def plot_results(trace):
 
     fig.tight_layout(pad=1.0)
     fig.savefig(os.path.join(output_dir, 'model_fit.pdf'), bbox_inches='tight')
+    plt.close('all')
     print(f"Figures saved to: {output_dir}")
-    plt.show()
 
 # ======================================================================================================================
 # SAVE TRACES
