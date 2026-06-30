@@ -12,9 +12,9 @@ nbins = 50               # Interpolation step for the InSAR median
 # ======================================================================================================================
 # MCMC parameters
 # ======================================================================================================================
-niter = 1000  # Total number of iterations
-nburn = 500   # Number of burn-in iterations
-n_samples = 300  # Number of posterior draws to display
+niter = 4000  # Total number of iterations
+nburn = 3500   # Number of burn-in iterations
+n_samples = 500  # Number of posterior draws to display
 chains = 9     # Number of MCMC chains
 cores = 9      # Number of CPU cores used
 
@@ -39,6 +39,7 @@ Ymin     = 5000    # Fault computation start position (m)
 Ymax     = 24800   # Fault computation end position (m)
 di       = 4000    # Layer thickness (m)
 n_tot    = 1       # Total number of models
+Z_ref    = 3307.0  # Reference elevation of initial flat strata in kinematic.py (G_Z0)
 
 # ======================================================================================================================
 # Data paths
