@@ -31,6 +31,8 @@ def usage():
     print('-h Show this screen')
 
 # Load input file
+import shutil
+
 try:
     opts, args = getopt.getopt(sys.argv[1:], "h", ["help"])
 except:
@@ -47,29 +49,25 @@ if 1 == len(sys.argv):
     assert False, "no input file"
     sys.exit()
 
-if len(sys.argv) > 1:
+fname = sys.argv[1]
+print('Read input file {0} '.format(fname))
+try:
     try:
-        fname = sys.argv[1]
-        print('Read input file {0} '.format(fname))
-        try:
-            sys.path.append(path.dirname(path.abspath(fname)))
-            exec("from " + path.basename(fname) + " import *")
-        except:
-            exec(open(fname).read())
+        sys.path.append(path.dirname(path.abspath(fname)))
+        exec("from " + path.basename(fname) + " import *")
+    except:
+        exec(open(fname).read())
+except Exception as e:
+    print('Problem in input file:', e)
+    sys.exit()
 
-    except Exception as e:
-        print('Problem in input file')
-        sys.exit()
-
-# Output directory — use output_dir from input file if defined, else wdir/output
+# Output directory — output_dir from input file, else wdir/output
 output_dir = globals().get('output_dir', os.path.join(globals().get('wdir', '.'), 'output'))
 os.makedirs(output_dir, exist_ok=True)
 print(f"Output directory: {output_dir}")
 
 # Copy input file to output directory for reproducibility
-import shutil
-if len(sys.argv) > 1:
-    shutil.copy2(sys.argv[1], os.path.join(output_dir, path.basename(sys.argv[1])))
+shutil.copy2(fname, os.path.join(output_dir, path.basename(fname)))
 
 # ======================================================================================================================
 # DATA LOADING
