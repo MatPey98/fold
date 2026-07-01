@@ -66,6 +66,11 @@ output_dir = globals().get('output_dir', os.path.join(globals().get('wdir', '.')
 os.makedirs(output_dir, exist_ok=True)
 print(f"Output directory: {output_dir}")
 
+# Copy input file to output directory for reproducibility
+import shutil
+if len(sys.argv) > 1:
+    shutil.copy2(sys.argv[1], os.path.join(output_dir, path.basename(sys.argv[1])))
+
 # ======================================================================================================================
 # DATA LOADING
 # ======================================================================================================================
@@ -132,7 +137,7 @@ def forward_model(beta, teta, omega, Y_r2, Y_r3, W, W2, Smax):
     Ych2 = results["Ych2"]
     Ych3 = results["Ych3"]
 
-    Z_interp = np.interp(y_insar_filtered, results["Y_save"], results["Z_save"] - 3307)
+    Z_interp = np.interp(y_insar_filtered, results["Y_save"], results["Z_save"] - Z_ref)
     shortening_interp = np.interp(y_insar_filtered, results["Y_save"], results["horizontal_shortening"])
 
     if np.any(np.isnan(Z_interp)) or np.any(np.isinf(Z_interp)) or np.any(Ych2 < Ych3) or np.any(np.isnan(Y_r2)):
