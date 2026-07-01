@@ -6,6 +6,7 @@ Bayesian inversion of a fault-bend fold using InSAR surface velocity fields and 
 1. `invert_plan.py` — visualize all available data on the profile and measure fault/strata dip from the DEM to constrain the priors
 2. `optimize_kinematic.py` — run the Bayesian inversion using priors informed by step 1
 3. `plot_histo.py` — plot posterior histograms from the trace files saved by step 2
+4. `plot_model_fit.py` — regenerate the data vs. model figure from saved traces (without re-running the inversion)
 
 ---
 
@@ -17,15 +18,18 @@ fold/
 │   ├── invert_plan.py          # Step 1: data visualization + dip inversion from DEM
 │   ├── optimize_kinematic.py   # Step 2: Bayesian MCMC inversion
 │   ├── plot_histo.py           # Step 3: posterior histogram plots from trace files
+│   ├── plot_model_fit.py       # Step 4: data vs. model figure from saved traces
 │   ├── kinematic.py            # Forward model: tri-ramp fault geometry + kink-band kinematics
 │   ├── dip.py                  # Dip class: plane fitting + projection onto profile
 │   ├── read_data.py            # I/O classes: Insar, MNT, Seismic
 │   └── profile.py              # Profile class: swath projection of 2D spatial data
+├── example/
+│   └── input_optimize_kinematic.py   # Example configuration file
 └── README.md
 work/
 └── fold/
     ├── input_invert_plan.py          # Configuration for step 1
-    └── input_optimize_kinematic.py   # Configuration for step 2
+    └── input_optimize_kinematic.py   # Configuration for steps 2, 3 and 4
 ```
 
 ---
@@ -178,6 +182,14 @@ Constraint enforced: β > θ > ω (geometrically required).
 | `Ymax` | Model domain end — also used to filter InSAR data (m) |
 | `di` | Number of material points discretizing the deforming layer |
 | `n_tot` | Number of incremental shortening steps (1 = single step) |
+| `Z_ref` | Reference elevation of the initial flat strata in `kinematic.py` — used to convert absolute elevations to relative uplift (m) |
+| `nbins` | Number of bins for along-profile InSAR median smoothing |
+
+#### Output
+
+| Parameter | Description |
+|-----------|-------------|
+| `output_dir` | Directory for saved figures and trace files (default: `wdir/output`). The input file is automatically copied here at the start of each run. |
 
 #### Data paths
 
@@ -223,6 +235,7 @@ All figures are saved as PDF to `output_dir` (configurable in the input file).
 
 ## Step 3 — Posterior histogram plots (`plot_histo.py`)
 
+
 Reads the trace text files saved by `optimize_kinematic.py` and produces publication-ready histogram figures with mean and 95% HDI for each parameter.
 
 **Usage:**
@@ -243,6 +256,37 @@ python3 fold/python/plot_histo.py work/fold/output/traces/ work/fold/output/
 | `posterior_dip_angles.pdf` | Dip angles β, θ, ω overlaid for direct comparison |
 
 The seismic catalogue supports mixed date formats (USGS, Sun2012, Zha2013). Missing RMS values default to 1 km.
+
+---
+
+## Step 4 — Data vs. model figure (`plot_model_fit.py`)
+
+Regenerates the InSAR data vs. model predictions figure from the trace files saved by `optimize_kinematic.py`, without re-running the inversion. Uses the same input file as step 2.
+
+**Usage:**
+```bash
+python3 fold/python/plot_model_fit.py <input_file> <traces_dir> [output_dir]
+```
+
+Example:
+```bash
+python3 fold/python/plot_model_fit.py work/fold/kinematic/input_optimize_kinematic.py \
+    work/fold/kinematic/traces/ work/fold/kinematic/
+```
+
+The input file is automatically copied into `output_dir` by `optimize_kinematic.py`, so you can always point directly to it from there.
+
+**Output:**
+
+| File | Description |
+|------|-------------|
+| `model_fit.pdf` | Vertical profile, shortening profile, and posterior fault geometry |
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--filter-mode` | Restrict each parameter to its primary KDE peak before computing the mean (useful for bimodal posteriors) |
 
 ---
 
