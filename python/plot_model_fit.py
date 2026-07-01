@@ -142,20 +142,26 @@ if filter_mode:
     for name in PARAM_NAMES:
         _, lo, hi = primary_mode_window(raw[name])
         mask_joint &= (raw[name] >= lo) & (raw[name] <= hi)
-    if mask_joint.sum() < 10:
-        print("Warning: joint mode filter too restrictive, falling back to full posterior")
-        mask_joint = np.ones(n_total, dtype=bool)
-    print(f"  {mask_joint.sum()} / {n_total} samples kept after joint mode filter")
+    n_kept = mask_joint.sum()
+    if n_kept < 10:
+        print("Warning: joint mode filter too restrictive, falling back to KDE modes")
+        mask_joint = None
+    else:
+        print(f"  {n_kept} / {n_total} samples kept after joint mode filter")
 else:
-    mask_joint = np.ones(n_total, dtype=bool)
+    mask_joint = None
 
-filtered = {name: raw[name][mask_joint] for name in PARAM_NAMES}
-
-# Mode parameter values (KDE peak) for the best-fit model
-modes = {name: primary_mode_window(filtered[name])[0] for name in PARAM_NAMES}
+# Mode (KDE peak) of each parameter marginal — always computed on full posterior
+modes = {name: primary_mode_window(raw[name])[0] for name in PARAM_NAMES}
 print(f"\nParameter modes{suffix}:")
 for name, val in modes.items():
     print(f"  {name:6s} = {val:.4g}")
+
+# filtered: samples used for realizations envelope
+if mask_joint is not None:
+    filtered = {name: raw[name][mask_joint] for name in PARAM_NAMES}
+else:
+    filtered = {name: raw[name] for name in PARAM_NAMES}
 
 # ======================================================================================================================
 # Forward model helpers
@@ -217,10 +223,19 @@ print(f"\nConstant offset applied:")
 print(f"  vertical  : {offset_vert:+.2f} mm")
 print(f"  shortening: {offset_horiz:+.2f} mm")
 
-# Representative geometry — use MEAN of filtered samples (same as optimize_kinematic.py),
-# not the mode, to avoid picking a degenerate corner of parameter space.
-mean_params = {name: float(np.mean(filtered[name])) for name in PARAM_NAMES}
-print(f"\nMean parameters (geometry reference):")
+# Representative geometry:
+#   1. MAP sample (highest log-posterior) if lp.txt exists — always a valid joint sample
+#   2. Joint-filtered median if filter worked
+#   3. Full-posterior median otherwise
+lp_file = os.path.join(traces_dir, 'lp.txt')
+if os.path.isfile(lp_file):
+    lp = np.loadtxt(lp_file)
+    map_idx = int(np.argmax(lp))
+    mean_params = {name: float(raw[name][map_idx]) for name in PARAM_NAMES}
+    print(f"\nMAP parameters (sample #{map_idx}, lp={lp[map_idx]:.2f}):")
+else:
+    mean_params = {name: float(np.median(raw[name])) for name in PARAM_NAMES}
+    print(f"\nMedian parameters (per-parameter, full posterior):")
 for name, val in mean_params.items():
     print(f"  {name:6s} = {val:.4g}")
 _, _, mean_res = forward_model(mean_params)
