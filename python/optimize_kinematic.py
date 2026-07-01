@@ -421,6 +421,7 @@ def save_traces(trace):
 
     Files are written to output_dir/traces/. Each file contains all chains
     concatenated (flattened), one value per line.
+    Also saves lp.txt (log-posterior) so plot_model_fit can find the MAP sample.
     """
     var_names = ["beta", "teta", "omega", "Y_r2", "Y_r3", "W", "W2", "Smax"]
     traces_dir = os.path.join(output_dir, 'traces')
@@ -430,6 +431,10 @@ def save_traces(trace):
         fname = os.path.join(traces_dir, f'{var}.txt')
         np.savetxt(fname, samples, fmt='%.6f')
         print(f"  Saved {var:8s} → {fname}")
+    # Save log-posterior (lp) — used to identify the MAP (best-fit) sample
+    lp = trace.sample_stats.lp.values.flatten()
+    np.savetxt(os.path.join(traces_dir, 'lp.txt'), lp, fmt='%.6f')
+    print(f"  Saved lp       → {os.path.join(traces_dir, 'lp.txt')}")
     print(f"Traces saved to: {traces_dir}")
     return traces_dir
 

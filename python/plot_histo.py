@@ -69,20 +69,22 @@ def primary_mode_window(samples, n_grid=2000):
 # ======================================================================================================================
 
 def plot_histo(samples, label, ax, hdi_prob=0.95, bins=30, color='steelblue',
-               filter_mode=False):
+               filter_mode=False, mask=None, map_value=None):
     """
-    Plot a posterior histogram with mean/mode and HDI on ax.
+    Plot a posterior histogram with reference value and HDI on ax.
 
     Parameters
     ----------
-    samples     : 1-D array of posterior draws
-    label       : parameter name shown in title
-    ax          : matplotlib Axes
-    hdi_prob    : credible interval probability (default 0.95)
-    bins        : number of histogram bins
-    color       : fill color
-    filter_mode : if True, restrict samples to the primary KDE peak FWHM window
-                  before computing statistics (useful for bimodal posteriors)
+    samples   : 1-D array of posterior draws
+    label     : parameter name shown in title
+    ax        : matplotlib Axes
+    hdi_prob  : credible interval probability (default 0.95)
+    bins      : number of histogram bins
+    color     : fill color
+    filter_mode : if True, restrict samples using the joint mask
+    mask      : boolean array (joint mode mask); used when filter_mode=True
+    map_value : if provided, draw this value as the reference (MAP/best-fit);
+                otherwise use the median of stat_samples
     """
     samples = np.asarray(samples, dtype=float)
     samples = samples[np.isfinite(samples)]
@@ -96,11 +98,10 @@ def plot_histo(samples, label, ax, hdi_prob=0.95, bins=30, color='steelblue',
 
     mode, lo, hi = primary_mode_window(samples)
 
-    if filter_mode:
-        sel = samples[(samples >= lo) & (samples <= hi)]
+    if filter_mode and mask is not None:
+        sel = samples[mask]
         if len(sel) < 10:
-            sel = samples   # fallback if window too narrow
-        # Overlay the mode-filtered distribution
+            sel = samples
         ax.hist(sel, bins=bins, density=True, histtype='stepfilled',
                 alpha=0.55, color=color)
         stat_samples = sel
@@ -109,15 +110,22 @@ def plot_histo(samples, label, ax, hdi_prob=0.95, bins=30, color='steelblue',
         stat_samples = samples
         suffix = ""
 
-    mean = stat_samples.mean()
-    hdi  = az.hdi(stat_samples, hdi_prob=hdi_prob)
+    hdi = az.hdi(stat_samples, hdi_prob=hdi_prob)
 
-    ax.axvline(mean,   color='crimson', linewidth=1.5)
+    # Reference value: MAP if available, else median
+    if map_value is not None:
+        ref = map_value
+        ref_label = "MAP"
+    else:
+        ref = float(np.median(stat_samples))
+        ref_label = "median"
+
+    ax.axvline(ref,    color='crimson', linewidth=1.5, label=ref_label)
     ax.axvline(hdi[0], color='crimson', linewidth=1.0, linestyle='--', alpha=0.7)
     ax.axvline(hdi[1], color='crimson', linewidth=1.0, linestyle='--', alpha=0.7)
     ax.axvline(mode,   color='black',   linewidth=1.0, linestyle=':',  alpha=0.8)
 
-    ax.set_title(f"{label}{suffix}\n{mean:.3g}  [{hdi[0]:.3g} – {hdi[1]:.3g}]",
+    ax.set_title(f"{label}{suffix}\n{ref_label}={ref:.3g}  [{hdi[0]:.3g} – {hdi[1]:.3g}]",
                  fontsize=8)
     ax.tick_params(labelsize=7)
 
@@ -174,6 +182,37 @@ def main():
         print(f"No trace files found in {traces_dir}")
         sys.exit(1)
 
+    # ── MAP sample from lp.txt (if available) ───────────────────────────────
+    lp_file = os.path.join(traces_dir, 'lp.txt')
+    if os.path.isfile(lp_file):
+        lp = np.loadtxt(lp_file)
+        map_idx = int(np.argmax(lp))
+        map_values = {stem: loaded[stem][0][map_idx] for stem in loaded}
+        print(f"MAP sample: index {map_idx}, lp={lp[map_idx]:.2f}")
+    else:
+        map_values = None
+        print("lp.txt not found — using per-parameter median as reference")
+
+    # ── joint mode filter ────────────────────────────────────────────────────
+    # Compute one joint mask: a sample survives only if ALL parameters fall
+    # within their respective primary KDE peak window simultaneously.
+    # This ensures consistent statistics across parameters (same as plot_model_fit.py).
+    if filter_mode:
+        n_total = len(next(iter(loaded.values()))[0])
+        mask_joint = np.ones(n_total, dtype=bool)
+        for stem, _, _ in PARAMS:
+            if stem in loaded:
+                samples_s = loaded[stem][0]
+                _, lo, hi = primary_mode_window(samples_s)
+                mask_joint &= (samples_s >= lo) & (samples_s <= hi)
+        n_kept = mask_joint.sum()
+        print(f"Joint mode filter: {n_kept} / {n_total} samples kept")
+        if n_kept < 10:
+            print("Warning: joint mode filter too restrictive, falling back to KDE modes")
+            mask_joint = None
+    else:
+        mask_joint = None
+
     n_params = len(loaded)
     n_cols   = 4
     n_rows   = (n_params + n_cols - 1) // n_cols
@@ -189,8 +228,10 @@ def main():
             axes[k].set_visible(False)
             continue
         samples, lbl, unit = loaded[stem]
+        map_val = map_values[stem] if map_values is not None else None
         plot_histo(samples, f"{lbl}\n({unit})", axes[k],
-                   color=COLORS[k % len(COLORS)], filter_mode=filter_mode)
+                   color=COLORS[k % len(COLORS)], filter_mode=filter_mode,
+                   mask=mask_joint, map_value=map_val)
 
     # hide unused subplots
     for k in range(len(PARAMS), len(axes)):
@@ -208,14 +249,15 @@ def main():
         if stem in loaded:
             samples, _, _ = loaded[stem]
             mode, lo, hi = primary_mode_window(samples)
-            sel = samples[(samples >= lo) & (samples <= hi)] if filter_mode else samples
+            sel = samples[mask_joint] if filter_mode else samples
             if len(sel) < 10:
                 sel = samples
             ax.hist(samples, bins=30, density=True, histtype='stepfilled',
                     alpha=0.2, color=color)
             ax.hist(sel, bins=30, density=True, histtype='stepfilled',
                     alpha=0.45, color=color, label=short)
-            ax.axvline(sel.mean(), color=color, linewidth=1.5, linestyle='-')
+            ref = map_values[stem] if map_values else float(np.median(sel))
+            ax.axvline(ref, color=color, linewidth=1.5, linestyle='-')
             hdi = az.hdi(sel, hdi_prob=0.95)
             ax.axvline(hdi[0], color=color, linewidth=1.0, linestyle='--', alpha=0.7)
             ax.axvline(hdi[1], color=color, linewidth=1.0, linestyle='--', alpha=0.7)
