@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Output directories
+output_create_synthetic/
+
+# Figures générées
+cross_section.pdf
+*.tif.aux.xml
+
+# Sandbox outputs
+sandbox/**/.DS_Store
+sandbox/**/__pycache__/
+sandbox/**/output_create_synthetic/
