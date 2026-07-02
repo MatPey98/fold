@@ -58,7 +58,7 @@ def compute_fault_and_axial_surfaces(params, Y_insar, Z_insar):
 
     # Shortening
     Smax   = params["Smax"]
-    di     = params.get("di", 4000)
+    di     = params.get("di", 500)
     deltaS = Smax
 
     # ============================================================================
@@ -126,158 +126,195 @@ def compute_fault_and_axial_surfaces(params, Y_insar, Z_insar):
     Y_asurf4, Z_asurf4 = Y_fault_trace, Asurf4(Y_fault_trace)
 
     # ============================================================================
-    # SURFACE DEFORMATION
+    # SURFACE DEFORMATION  (fully vectorized — no Python for loop)
     # ============================================================================
-    angle = np.linspace(np.pi, 2 * np.pi, 10000)
-
-    G_Y0      = np.linspace(0, Y_fault, di + 1) # Y initials avant deformation
-    G_Z0      = np.full(di + 1, Z_fault) # z initials avant deformation
+    G_Y0      = np.linspace(0, Y_fault, di + 1)
+    G_Z0      = np.full(di + 1, float(Z_fault))
     Y_initial = G_Y0.copy()
 
-    deltaZ_char2 = Rc * np.cos(teta)
-    deltaY_char2 = Rc * np.sin(teta)
-
-    hyp3 = 0.0
     S = deltaS
-
     Y = G_Y0.copy()
-    Z = G_Z0.copy()
+    Z = G_Z0.copy()   # all points start at Z = Z_fault
 
-    a_traj  = np.tan(teta)
-    b_traj  = Z - Y * a_traj
-    Ypoint  = (b_traj - b_surf2) / (coef - a_traj)
-    Zpoint  = Asurf2(Ypoint)
-    Ypoint2 = Ypoint - Rc * np.sin(teta) + Rc * np.sin(beta)
-    Zpoint2 = Zpoint + Rc * np.cos(teta) - Rc * np.cos(beta)
+    # Precompute scalar trig
+    cos_b = np.cos(beta);  sin_b = np.sin(beta)
+    cos_t = np.cos(teta);  sin_t = np.sin(teta)
+    cos_o = np.cos(omega); sin_o = np.sin(omega)
 
-    for l in range(di + 1):
+    # Arc-length and chord constants (computed once, reused across zones)
+    dTO = Rc2 * (teta - omega)         # arc through hinge 2
+    dTB = Rc  * (beta - teta)          # arc through hinge 1
+    deltaZ_char2 = Rc * cos_t
+    deltaY_char2 = Rc * sin_t
+    # Full-arc chord vectors (constants for zones 1 & 2)
+    _hypote_to = 2 * Rc2 * np.sin((teta - omega) / 2)
+    _jela_to   = (teta - omega) / 2 + omega
+    _cos_jto   = np.cos(_jela_to); _sin_jto = np.sin(_jela_to)
+    _hypote_tb = 2 * Rc  * np.sin((beta - teta) / 2)
+    _jela_tb   = (beta - teta) / 2 + teta
+    _cos_jtb   = np.cos(_jela_tb); _sin_jtb = np.sin(_jela_tb)
 
-        # ── Zone 1: below southern axial surface ──────────────────────────
-        if Z[l] < Asurf4(Y[l]):
-            a_temp = np.tan(omega)
-            b_temp = Z[l] - a_temp * Y[l]
-            Yp   = (b_temp - b_surf4) / (coef2 - a_temp)
-            hypo = (Yp - Y[l]) / np.cos(omega)
+    # ── Zone membership ─────────────────────────────────────────────────────
+    # All points start at Z = Z_fault (const), so Z[l] < Asurf_i(Y[l]) reduces
+    # to a Y threshold (coef < 0 → inequality flips on division).
+    thresh4 = (Z_fault - b_surf4) / coef2   # Zone 1 / 2 boundary
+    thresh3 = (Z_fault - b_surf3) / coef2   # Zone 2 / 3 boundary
+    thresh2 = (Z_fault - b_surf2) / coef    # Zone 3 / 4 boundary
+    thresh1 = (Z_fault - b_surf1) / coef    # Zone 4 / 5 boundary
 
-            if S < hypo:
-                Y[l] += S * np.cos(omega)
-                Z[l] += S * np.sin(omega)
-            elif S < hypo + Rc2 * (teta - omega):
-                phi    = (S - hypo) / Rc2
-                hypote = 2 * Rc2 * np.sin(phi / 2)
-                jela   = phi / 2 + omega
-                Y[l] += hypote * np.cos(jela) + hypo * np.cos(omega)
-                Z[l] += hypote * np.sin(jela) + hypo * np.sin(omega)
-            elif S < hypo + Rc2 * (teta - omega) + hyp3:
-                c      = S - hypo - Rc2 * (teta - omega)
-                hypote = 2 * Rc2 * np.sin((teta - omega) / 2)
-                jela   = (teta - omega) / 2 + omega
-                Y[l] += hypote * np.cos(jela) + hypo * np.cos(omega) + c * np.cos(teta)
-                Z[l] += hypote * np.sin(jela) + hypo * np.sin(omega) + c * np.sin(teta)
-            elif S < hypo + Rc2 * (teta - omega) + hyp3 + Rc * (beta - teta):
-                c       = S - hypo - Rc2 * (teta - omega) - hyp3
-                hypote  = 2 * Rc2 * np.sin((teta - omega) / 2)
-                jela    = (teta - omega) / 2 + omega
-                hypote2 = 2 * Rc * np.sin(c / (2 * Rc))
-                jela2   = c / (2 * Rc) + teta
-                Y[l] += hypo*np.cos(omega) + hypote*np.cos(jela) + hyp3*np.cos(teta) + hypote2*np.cos(jela2)
-                Z[l] += hypo*np.sin(omega) + hypote*np.sin(jela) + hyp3*np.sin(teta) + hypote2*np.sin(jela2)
-            else:
-                c       = S - hypo - Rc2 * (teta - omega) - hyp3 - Rc * (beta - teta)
-                hypote  = 2 * Rc2 * np.sin((teta - omega) / 2)
-                jela    = (teta - omega) / 2 + omega
-                hypote2 = 2 * Rc * np.sin((beta - teta) / 2)
-                jela2   = (beta - teta) / 2 + teta
-                Y[l] += hypo*np.cos(omega) + hypote*np.cos(jela) + hyp3*np.cos(teta) + hypote2*np.cos(jela2) + c*np.cos(beta)
-                Z[l] += hypo*np.sin(omega) + hypote*np.sin(jela) + hyp3*np.sin(teta) + hypote2*np.sin(jela2) + c*np.sin(beta)
+    m1 = Y < thresh4
+    m2 = ~m1 & (Y < thresh3)
+    m3 = ~m1 & ~m2 & (Y < thresh2)
+    m4 = ~m1 & ~m2 & ~m3 & (Y < thresh1)
+    m5 = ~m1 & ~m2 & ~m3 & ~m4
 
-        # ── Zone 2: in southern hinge ─────────────────────────────────────
-        elif Z[l] < Asurf3(Y[l]):
-            Zc   = Z[l] - Rc2 * np.sin(angle)
-            Yc   = Y[l] - Rc2 * np.cos(angle)
-            idx  = np.argmin(np.abs(Zc - (Yc * abis2 + bbis2)))
-            sol_Y, sol_Z = Yc[idx], Zc[idx]
-            dey1 = np.abs(sol_Y - Y[l])
-            dez1 = np.abs(sol_Z - Z[l])
-            phi3 = np.arctan2(dey1, dez1)
-            dist = Rc2 * (teta + phi3) if Y[l] < sol_Y else Rc2 * (teta - phi3)
+    # ── Helper: analytical circle–bisector intersection ─────────────────────
+    def _circle_bisect(Yp, Zp, Rc_h, a_bis, b_bis):
+        """
+        For each point (Yp[i], Zp[i]), find where the circle of radius Rc_h
+        centred at that point intersects Z = a_bis*Y + b_bis.
+        Returns the root with angle θ ∈ [π, 2π]  (sin θ ≤ 0), which matches
+        the original np.argmin scan over angle = linspace(π, 2π, 10000).
+        """
+        K   = (Zp - a_bis * Yp - b_bis) / Rc_h
+        R   = np.sqrt(1.0 + a_bis ** 2)
+        phi = np.arctan(a_bis)                           # scalar
+        psi = np.arcsin(np.clip(K / R, -1.0, 1.0))      # ∈ [-π/2, π/2]
+        th1 = (phi + psi)           % (2 * np.pi)
+        th2 = (phi + np.pi - psi)   % (2 * np.pi)
+        theta = np.where(np.sin(th1) <= 0, th1, th2)    # pick root in [π, 2π]
+        return Yp - Rc_h * np.cos(theta), Zp - Rc_h * np.sin(theta)
 
-            dZ1 = Rc2 * np.cos(teta); dY1 = Rc2 * np.sin(teta)
-            if Y[l] < sol_Y:
-                Yinta = Y[l] + dey1 + dY1;  Zinta = Z[l] - dZ1 + dez1
-            else:
-                Yinta = Y[l] - dey1 + dY1;  Zinta = Z[l] - dZ1 + dez1
+    # ── Zone 5: above Asurf1 → ramp1 (β) ────────────────────────────────────
+    Y[m5] += S * cos_b
+    Z[m5] += S * sin_b
 
-            b_ramp_int = Zinta - aramp2 * Yinta
-            Yinta2 = (b_ramp_int - b_surf2) / (coef - aramp2)
-            Zinta2 = aramp2 * Yinta2 + b_ramp_int
-            hyp3   = np.sqrt((Zinta2 - Zinta)**2 + (Yinta2 - Yinta)**2)
-            dist_int = dist + hyp3
-            dist_tot = dist + hyp3 + Rc * (beta - teta)
+    # ── Zone 4: northern hinge ───────────────────────────────────────────────
+    if m4.any():
+        Y4 = Y[m4]; Z4 = Z[m4]
+        sol_Y4, sol_Z4 = _circle_bisect(Y4, Z4, Rc, abis, bbis)
+        dey4   = np.abs(sol_Y4 - Y4)
+        dez4   = np.abs(sol_Z4 - Z4)
+        phi3_4 = np.arctan2(dey4, dez4)
+        hypo4  = Rc * (beta - phi3_4)
 
-            if S < dist:
-                if omega < 0:
-                    phi  = S / Rc2
-                    rota = np.arccos((Y[l] - sol_Y) / Rc2)
-                    Y[l] = sol_Y + Rc2 * np.cos(-rota + phi)
-                    Z[l] = sol_Z + Rc2 * np.sin(-rota + phi)
-                else:
-                    phi1 = S / Rc2
-                    Y[l] = Y[l] - dey1 + Rc2 * np.sin(phi1 + phi3)
-                    Z[l] = Z[l] - Rc2 * np.cos(phi1 + phi3) + dez1
-            elif S < dist_int:
-                Y[l] = Yinta + (S - dist) * np.cos(teta)
-                Z[l] = Zinta + (S - dist) * np.sin(teta)
-            elif S < dist_tot:
-                c    = S - dist - hyp3
-                phi4 = c / Rc
-                Y[l] = Yinta2 - Rc*np.sin(teta) + Rc*np.sin(teta + phi4)
-                Z[l] = Zinta2 + Rc*np.cos(teta) - Rc*np.cos(teta + phi4)
-            else:
-                c    = S - dist - hyp3 - Rc * (beta - teta)
-                Y[l] = Yinta2 - Rc*np.sin(teta) + Rc*np.sin(beta) + c*np.cos(beta)
-                Z[l] = Zinta2 + Rc*np.cos(teta) - Rc*np.cos(beta) + c*np.sin(beta)
+        s4a    = S < hypo4
+        phi1_4 = np.where(s4a, S / Rc, 0.0)
+        c4     = np.where(~s4a, S - hypo4, 0.0)
 
-        # ── Zone 3: between the two hinges ───────────────────────────────
-        elif Z[l] < Asurf2(Y[l]):
-            Hyp = np.hypot(Ypoint[l] - Y[l], Zpoint[l] - Z[l])
-            if S < Hyp:
-                Y[l] += S * np.cos(teta)
-                Z[l] += S * np.sin(teta)
-            elif S < Hyp + Rc * (beta - teta):
-                phi  = (S - Hyp) / Rc
-                Y[l] = Ypoint[l] - deltaY_char2 + np.abs(Rc * np.sin(teta + phi))
-                Z[l] = Zpoint[l] - np.abs(Rc * np.cos(teta + phi)) + deltaZ_char2
-            else:
-                c    = S - Hyp - Rc * (beta - teta)
-                Y[l] = Ypoint2[l] + c * np.cos(beta)
-                Z[l] = Zpoint2[l] + c * np.sin(beta)
+        Y[m4] = np.where(s4a,
+                         Y4 - dey4 + Rc * np.sin(phi1_4 + phi3_4),
+                         Y4 - dey4 + Rc * sin_b + c4 * cos_b)
+        Z[m4] = np.where(s4a,
+                         Z4 - Rc * np.cos(phi1_4 + phi3_4) + dez4,
+                         Z4 - Rc * np.cos(beta) + dez4 + c4 * sin_b)
 
-        # ── Zone 4: in northern hinge ─────────────────────────────────────
-        elif Z[l] < Asurf1(Y[l]):
-            Zc   = Z[l] - Rc * np.sin(angle)
-            Yc   = Y[l] - Rc * np.cos(angle)
-            idx  = np.argmin(np.abs(Zc - (Yc * abis + bbis)))
-            sol_Y, sol_Z = Yc[idx], Zc[idx]
-            dez  = np.abs(sol_Z - Z[l])
-            dey  = np.abs(sol_Y - Y[l])
-            phi3 = np.arctan2(dey, dez)
-            hypo = Rc * (beta - phi3)
+    # ── Zone 3: between hinges → ramp2 (θ) ──────────────────────────────────
+    if m3.any():
+        Y3 = Y[m3]; Z3 = Z[m3]
+        b_t3  = Z3 - Y3 * np.tan(teta)
+        Yp3   = (b_t3 - b_surf2) / (coef - np.tan(teta))
+        Zp3   = coef * Yp3 + b_surf2
+        Yp2_3 = Yp3 - deltaY_char2 + Rc * sin_b
+        Zp2_3 = Zp3 + deltaZ_char2 - Rc * cos_b
+        Hyp3  = np.hypot(Yp3 - Y3, Zp3 - Z3)
 
-            if S < hypo:
-                phi1 = S / Rc
-                Y[l] = Y[l] - dey + Rc * np.sin(phi1 + phi3)
-                Z[l] = Z[l] - Rc * np.cos(phi1 + phi3) + dez
-            else:
-                Yint = Y[l] - dey + Rc * np.sin(beta)
-                Zint = Z[l] - Rc * np.cos(beta) + dez
-                Y[l] = Yint + (S - hypo) * np.cos(beta)
-                Z[l] = Zint + (S - hypo) * np.sin(beta)
+        s3a   = S < Hyp3
+        s3b   = ~s3a & (S < Hyp3 + dTB)
+        s3c   = ~s3a & ~s3b
+        phi3b = np.where(s3b, (S - Hyp3) / Rc, 0.0)
+        c3c   = np.where(s3c, S - Hyp3 - dTB, 0.0)
 
-        # ── Zone 5: above northern axial surface ──────────────────────────
-        else:
-            Y[l] += S * np.cos(beta)
-            Z[l] += S * np.sin(beta)
+        Y[m3] = np.where(s3a, Y3 + S * cos_t,
+                np.where(s3b, Yp3 - deltaY_char2 + np.abs(Rc * np.sin(teta + phi3b)),
+                              Yp2_3 + c3c * cos_b))
+        Z[m3] = np.where(s3a, Z3 + S * sin_t,
+                np.where(s3b, Zp3 - np.abs(Rc * np.cos(teta + phi3b)) + deltaZ_char2,
+                              Zp2_3 + c3c * sin_b))
+
+    # ── Zone 2: southern hinge ───────────────────────────────────────────────
+    if m2.any():
+        Y2 = Y[m2]; Z2 = Z[m2]
+        sol_Y2, sol_Z2 = _circle_bisect(Y2, Z2, Rc2, abis2, bbis2)
+        dey2   = np.abs(sol_Y2 - Y2)
+        dez2   = np.abs(sol_Z2 - Z2)
+        phi3_2 = np.arctan2(dey2, dez2)
+        dist2  = np.where(Y2 < sol_Y2,
+                          Rc2 * (teta + phi3_2),
+                          Rc2 * (teta - phi3_2))
+
+        dY1_2  = Rc2 * sin_t;  dZ1_2 = Rc2 * cos_t
+        Yinta  = np.where(Y2 < sol_Y2, Y2 + dey2 + dY1_2, Y2 - dey2 + dY1_2)
+        Zinta  = Z2 - dZ1_2 + dez2
+
+        b_ri   = Zinta - aramp2 * Yinta
+        Yinta2 = (b_ri - b_surf2) / (coef - aramp2)
+        Zinta2 = aramp2 * Yinta2 + b_ri
+        hyp3_2 = np.hypot(Zinta2 - Zinta, Yinta2 - Yinta)
+
+        dist_int2 = dist2 + hyp3_2
+        dist_tot2 = dist2 + hyp3_2 + dTB
+
+        s2a = S < dist2
+        s2b = ~s2a & (S < dist_int2)
+        s2c = ~s2a & ~s2b & (S < dist_tot2)
+        s2d = ~s2a & ~s2b & ~s2c
+
+        # omega > 0 always (lower prior bound = 1°) → skip the omega < 0 branch
+        phi1_2 = np.where(s2a, S / Rc2, 0.0)
+        c2b    = np.where(s2b, S - dist2, 0.0)
+        c2c    = np.where(s2c, S - dist_int2, 0.0)
+        phi4_2 = c2c / Rc
+        c2d    = np.where(s2d, S - dist_int2 - dTB, 0.0)
+
+        Y[m2] = np.where(s2a, Y2 - dey2 + Rc2 * np.sin(phi1_2 + phi3_2),
+                np.where(s2b, Yinta  + c2b * cos_t,
+                np.where(s2c, Yinta2 - Rc * sin_t + Rc * np.sin(teta + phi4_2),
+                              Yinta2 - Rc * sin_t + Rc * sin_b + c2d * cos_b)))
+        Z[m2] = np.where(s2a, Z2 - Rc2 * np.cos(phi1_2 + phi3_2) + dez2,
+                np.where(s2b, Zinta  + c2b * sin_t,
+                np.where(s2c, Zinta2 + Rc * cos_t - Rc * np.cos(teta + phi4_2),
+                              Zinta2 + Rc * cos_t - Rc * cos_b + c2d * sin_b)))
+
+    # ── Zone 1: below Asurf4 → ω ramp, hinge2, hinge1, β ramp ──────────────
+    # hyp3 = 0 when zone 1 is processed (zone 1 Y < zone 2 Y in the point order),
+    # so the intermediate ramp2 segment is absent and one branch is dead code.
+    if m1.any():
+        Y1 = Y[m1]; Z1 = Z[m1]
+        b_t1  = Z1 - np.tan(omega) * Y1
+        Yp1   = (b_t1 - b_surf4) / (coef2 - np.tan(omega))
+        hypo1 = (Yp1 - Y1) / cos_o
+
+        s1a = S < hypo1
+        s1b = ~s1a & (S < hypo1 + dTO)
+        s1d = ~s1a & ~s1b & (S < hypo1 + dTO + dTB)
+        s1e = ~s1a & ~s1b & ~s1d
+
+        phi_1b     = np.where(s1b, (S - hypo1) / Rc2, 0.0)
+        hypote_1b  = 2 * Rc2 * np.sin(phi_1b / 2)
+        jela_1b    = phi_1b / 2 + omega
+
+        c1d        = np.where(s1d, S - hypo1 - dTO, 0.0)
+        hypote2_1d = 2 * Rc  * np.sin(c1d / (2 * Rc))
+        jela2_1d   = c1d / (2 * Rc) + teta
+
+        c1e = np.where(s1e, S - hypo1 - dTO - dTB, 0.0)
+
+        dY_base = hypo1 * cos_o
+        dZ_base = hypo1 * sin_o
+
+        Y[m1] = np.where(s1a, Y1 + S * cos_o,
+                np.where(s1b, Y1 + dY_base + hypote_1b * np.cos(jela_1b),
+                np.where(s1d, Y1 + dY_base + _hypote_to * _cos_jto
+                                            + hypote2_1d * np.cos(jela2_1d),
+                              Y1 + dY_base + _hypote_to * _cos_jto
+                                           + _hypote_tb * _cos_jtb + c1e * cos_b)))
+        Z[m1] = np.where(s1a, Z1 + S * sin_o,
+                np.where(s1b, Z1 + dZ_base + hypote_1b * np.sin(jela_1b),
+                np.where(s1d, Z1 + dZ_base + _hypote_to * _sin_jto
+                                            + hypote2_1d * np.sin(jela2_1d),
+                              Z1 + dZ_base + _hypote_to * _sin_jto
+                                           + _hypote_tb * _sin_jtb + c1e * sin_b)))
 
     mask               = Y < Y_fault
     Y_def             = Y[mask]
