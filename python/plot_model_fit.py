@@ -171,7 +171,7 @@ def forward_model(p):
     """Run the forward model with parameter dict p; return (z_vert, z_horiz)."""
     full = dict(p,
                 Y_faille=Y_faille, Z_faille=Z_faille,
-                Ymin=Ymin, Ymax=Ymax, di=di, n_tot=n_tot)
+                Ymin=Ymin, Ymax=Ymax, di=di)
     res = compute_fault_and_axial_surfaces(full, y_insar, z_insar)
     # G_Z0 in kinematic.py is initialised at 3307 m; subtract to get displacement
     # relative to initial flat layer — matches optimize_kinematic.py line 135

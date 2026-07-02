@@ -57,10 +57,9 @@ def compute_fault_and_axial_surfaces(params, Y_insar, Z_insar):
     Ymax = params["Ymax"]
 
     # Shortening
-    Smax  = params["Smax"]
-    n_tot = params.get("n_tot", 1)
-    di    = params.get("di", 4000)
-    deltaS = Smax / n_tot
+    Smax   = params["Smax"]
+    di     = params.get("di", 4000)
+    deltaS = Smax
 
     # ============================================================================
     # HINGE GEOMETRY
@@ -148,153 +147,149 @@ def compute_fault_and_axial_surfaces(params, Y_insar, Z_insar):
     hyp3 = 0.0
     S = deltaS
 
-    for n in range(1, n_tot + 1):
-        Y = G_Y0.copy()
-        Z = G_Z0.copy()
+    Y = G_Y0.copy()
+    Z = G_Z0.copy()
 
-        a_traj  = np.tan(teta)
-        b_traj  = Z - Y * a_traj
-        Ypoint  = (b_traj - b_surf2) / (coef - a_traj)
-        Zpoint  = Asurf2(Ypoint)
-        Ypoint2 = Ypoint - Rc * np.sin(teta) + Rc * np.sin(beta)
-        Zpoint2 = Zpoint + Rc * np.cos(teta) - Rc * np.cos(beta)
+    a_traj  = np.tan(teta)
+    b_traj  = Z - Y * a_traj
+    Ypoint  = (b_traj - b_surf2) / (coef - a_traj)
+    Zpoint  = Asurf2(Ypoint)
+    Ypoint2 = Ypoint - Rc * np.sin(teta) + Rc * np.sin(beta)
+    Zpoint2 = Zpoint + Rc * np.cos(teta) - Rc * np.cos(beta)
 
-        for l in range(di + 1):
+    for l in range(di + 1):
 
-            # ── Zone 1: below southern axial surface ──────────────────────────
-            if Z[l] < Asurf4(Y[l]):
-                a_temp = np.tan(omega)
-                b_temp = Z[l] - a_temp * Y[l]
-                Yp   = (b_temp - b_surf4) / (coef2 - a_temp)
-                hypo = (Yp - Y[l]) / np.cos(omega)
+        # ── Zone 1: below southern axial surface ──────────────────────────
+        if Z[l] < Asurf4(Y[l]):
+            a_temp = np.tan(omega)
+            b_temp = Z[l] - a_temp * Y[l]
+            Yp   = (b_temp - b_surf4) / (coef2 - a_temp)
+            hypo = (Yp - Y[l]) / np.cos(omega)
 
-                if S < hypo:
-                    Y[l] += S * np.cos(omega)
-                    Z[l] += S * np.sin(omega)
-                elif S < hypo + Rc2 * (teta - omega):
-                    phi    = (S - hypo) / Rc2
-                    hypote = 2 * Rc2 * np.sin(phi / 2)
-                    jela   = phi / 2 + omega
-                    Y[l] += hypote * np.cos(jela) + hypo * np.cos(omega)
-                    Z[l] += hypote * np.sin(jela) + hypo * np.sin(omega)
-                elif S < hypo + Rc2 * (teta - omega) + hyp3:
-                    c      = S - hypo - Rc2 * (teta - omega)
-                    hypote = 2 * Rc2 * np.sin((teta - omega) / 2)
-                    jela   = (teta - omega) / 2 + omega
-                    Y[l] += hypote * np.cos(jela) + hypo * np.cos(omega) + c * np.cos(teta)
-                    Z[l] += hypote * np.sin(jela) + hypo * np.sin(omega) + c * np.sin(teta)
-                elif S < hypo + Rc2 * (teta - omega) + hyp3 + Rc * (beta - teta):
-                    c       = S - hypo - Rc2 * (teta - omega) - hyp3
-                    hypote  = 2 * Rc2 * np.sin((teta - omega) / 2)
-                    jela    = (teta - omega) / 2 + omega
-                    hypote2 = 2 * Rc * np.sin(c / (2 * Rc))
-                    jela2   = c / (2 * Rc) + teta
-                    Y[l] += hypo*np.cos(omega) + hypote*np.cos(jela) + hyp3*np.cos(teta) + hypote2*np.cos(jela2)
-                    Z[l] += hypo*np.sin(omega) + hypote*np.sin(jela) + hyp3*np.sin(teta) + hypote2*np.sin(jela2)
-                else:
-                    c       = S - hypo - Rc2 * (teta - omega) - hyp3 - Rc * (beta - teta)
-                    hypote  = 2 * Rc2 * np.sin((teta - omega) / 2)
-                    jela    = (teta - omega) / 2 + omega
-                    hypote2 = 2 * Rc * np.sin((beta - teta) / 2)
-                    jela2   = (beta - teta) / 2 + teta
-                    Y[l] += hypo*np.cos(omega) + hypote*np.cos(jela) + hyp3*np.cos(teta) + hypote2*np.cos(jela2) + c*np.cos(beta)
-                    Z[l] += hypo*np.sin(omega) + hypote*np.sin(jela) + hyp3*np.sin(teta) + hypote2*np.sin(jela2) + c*np.sin(beta)
-
-            # ── Zone 2: in southern hinge ─────────────────────────────────────
-            elif Z[l] < Asurf3(Y[l]):
-                Zc   = Z[l] - Rc2 * np.sin(angle)
-                Yc   = Y[l] - Rc2 * np.cos(angle)
-                idx  = np.argmin(np.abs(Zc - (Yc * abis2 + bbis2)))
-                sol_Y, sol_Z = Yc[idx], Zc[idx]
-                dey1 = np.abs(sol_Y - Y[l])
-                dez1 = np.abs(sol_Z - Z[l])
-                phi3 = np.arctan2(dey1, dez1)
-                dist = Rc2 * (teta + phi3) if Y[l] < sol_Y else Rc2 * (teta - phi3)
-
-                dZ1 = Rc2 * np.cos(teta); dY1 = Rc2 * np.sin(teta)
-                if Y[l] < sol_Y:
-                    Yinta = Y[l] + dey1 + dY1;  Zinta = Z[l] - dZ1 + dez1
-                else:
-                    Yinta = Y[l] - dey1 + dY1;  Zinta = Z[l] - dZ1 + dez1
-
-                b_ramp_int = Zinta - aramp2 * Yinta
-                Yinta2 = (b_ramp_int - b_surf2) / (coef - aramp2)
-                Zinta2 = aramp2 * Yinta2 + b_ramp_int
-                hyp3   = np.sqrt((Zinta2 - Zinta)**2 + (Yinta2 - Yinta)**2)
-                dist_int = dist + hyp3
-                dist_tot = dist + hyp3 + Rc * (beta - teta)
-
-                if S < dist:
-                    if omega < 0:
-                        phi  = S / Rc2
-                        rota = np.arccos((Y[l] - sol_Y) / Rc2)
-                        Y[l] = sol_Y + Rc2 * np.cos(-rota + phi)
-                        Z[l] = sol_Z + Rc2 * np.sin(-rota + phi)
-                    else:
-                        phi1 = S / Rc2
-                        Y[l] = Y[l] - dey1 + Rc2 * np.sin(phi1 + phi3)
-                        Z[l] = Z[l] - Rc2 * np.cos(phi1 + phi3) + dez1
-                elif S < dist_int:
-                    Y[l] = Yinta + (S - dist) * np.cos(teta)
-                    Z[l] = Zinta + (S - dist) * np.sin(teta)
-                elif S < dist_tot:
-                    c    = S - dist - hyp3
-                    phi4 = c / Rc
-                    Y[l] = Yinta2 - Rc*np.sin(teta) + Rc*np.sin(teta + phi4)
-                    Z[l] = Zinta2 + Rc*np.cos(teta) - Rc*np.cos(teta + phi4)
-                else:
-                    c    = S - dist - hyp3 - Rc * (beta - teta)
-                    Y[l] = Yinta2 - Rc*np.sin(teta) + Rc*np.sin(beta) + c*np.cos(beta)
-                    Z[l] = Zinta2 + Rc*np.cos(teta) - Rc*np.cos(beta) + c*np.sin(beta)
-
-            # ── Zone 3: between the two hinges ───────────────────────────────
-            elif Z[l] < Asurf2(Y[l]):
-                Hyp = np.hypot(Ypoint[l] - Y[l], Zpoint[l] - Z[l])
-                if S < Hyp:
-                    Y[l] += S * np.cos(teta)
-                    Z[l] += S * np.sin(teta)
-                elif S < Hyp + Rc * (beta - teta):
-                    phi  = (S - Hyp) / Rc
-                    Y[l] = Ypoint[l] - deltaY_char2 + np.abs(Rc * np.sin(teta + phi))
-                    Z[l] = Zpoint[l] - np.abs(Rc * np.cos(teta + phi)) + deltaZ_char2
-                else:
-                    c    = S - Hyp - Rc * (beta - teta)
-                    Y[l] = Ypoint2[l] + c * np.cos(beta)
-                    Z[l] = Zpoint2[l] + c * np.sin(beta)
-
-            # ── Zone 4: in northern hinge ─────────────────────────────────────
-            elif Z[l] < Asurf1(Y[l]):
-                Zc   = Z[l] - Rc * np.sin(angle)
-                Yc   = Y[l] - Rc * np.cos(angle)
-                idx  = np.argmin(np.abs(Zc - (Yc * abis + bbis)))
-                sol_Y, sol_Z = Yc[idx], Zc[idx]
-                dez  = np.abs(sol_Z - Z[l])
-                dey  = np.abs(sol_Y - Y[l])
-                phi3 = np.arctan2(dey, dez)
-                hypo = Rc * (beta - phi3)
-
-                if S < hypo:
-                    phi1 = S / Rc
-                    Y[l] = Y[l] - dey + Rc * np.sin(phi1 + phi3)
-                    Z[l] = Z[l] - Rc * np.cos(phi1 + phi3) + dez
-                else:
-                    Yint = Y[l] - dey + Rc * np.sin(beta)
-                    Zint = Z[l] - Rc * np.cos(beta) + dez
-                    Y[l] = Yint + (S - hypo) * np.cos(beta)
-                    Z[l] = Zint + (S - hypo) * np.sin(beta)
-
-            # ── Zone 5: above northern axial surface ──────────────────────────
+            if S < hypo:
+                Y[l] += S * np.cos(omega)
+                Z[l] += S * np.sin(omega)
+            elif S < hypo + Rc2 * (teta - omega):
+                phi    = (S - hypo) / Rc2
+                hypote = 2 * Rc2 * np.sin(phi / 2)
+                jela   = phi / 2 + omega
+                Y[l] += hypote * np.cos(jela) + hypo * np.cos(omega)
+                Z[l] += hypote * np.sin(jela) + hypo * np.sin(omega)
+            elif S < hypo + Rc2 * (teta - omega) + hyp3:
+                c      = S - hypo - Rc2 * (teta - omega)
+                hypote = 2 * Rc2 * np.sin((teta - omega) / 2)
+                jela   = (teta - omega) / 2 + omega
+                Y[l] += hypote * np.cos(jela) + hypo * np.cos(omega) + c * np.cos(teta)
+                Z[l] += hypote * np.sin(jela) + hypo * np.sin(omega) + c * np.sin(teta)
+            elif S < hypo + Rc2 * (teta - omega) + hyp3 + Rc * (beta - teta):
+                c       = S - hypo - Rc2 * (teta - omega) - hyp3
+                hypote  = 2 * Rc2 * np.sin((teta - omega) / 2)
+                jela    = (teta - omega) / 2 + omega
+                hypote2 = 2 * Rc * np.sin(c / (2 * Rc))
+                jela2   = c / (2 * Rc) + teta
+                Y[l] += hypo*np.cos(omega) + hypote*np.cos(jela) + hyp3*np.cos(teta) + hypote2*np.cos(jela2)
+                Z[l] += hypo*np.sin(omega) + hypote*np.sin(jela) + hyp3*np.sin(teta) + hypote2*np.sin(jela2)
             else:
-                Y[l] += S * np.cos(beta)
-                Z[l] += S * np.sin(beta)
+                c       = S - hypo - Rc2 * (teta - omega) - hyp3 - Rc * (beta - teta)
+                hypote  = 2 * Rc2 * np.sin((teta - omega) / 2)
+                jela    = (teta - omega) / 2 + omega
+                hypote2 = 2 * Rc * np.sin((beta - teta) / 2)
+                jela2   = (beta - teta) / 2 + teta
+                Y[l] += hypo*np.cos(omega) + hypote*np.cos(jela) + hyp3*np.cos(teta) + hypote2*np.cos(jela2) + c*np.cos(beta)
+                Z[l] += hypo*np.sin(omega) + hypote*np.sin(jela) + hyp3*np.sin(teta) + hypote2*np.sin(jela2) + c*np.sin(beta)
 
-        if n == 1:
-            mask               = Y < Y_faille
-            Y_save             = Y[mask]
-            Z_save             = Z[mask]
-            horizontal_shortening = Y_initial[mask] - Y_save
+        # ── Zone 2: in southern hinge ─────────────────────────────────────
+        elif Z[l] < Asurf3(Y[l]):
+            Zc   = Z[l] - Rc2 * np.sin(angle)
+            Yc   = Y[l] - Rc2 * np.cos(angle)
+            idx  = np.argmin(np.abs(Zc - (Yc * abis2 + bbis2)))
+            sol_Y, sol_Z = Yc[idx], Zc[idx]
+            dey1 = np.abs(sol_Y - Y[l])
+            dez1 = np.abs(sol_Z - Z[l])
+            phi3 = np.arctan2(dey1, dez1)
+            dist = Rc2 * (teta + phi3) if Y[l] < sol_Y else Rc2 * (teta - phi3)
 
-        S += deltaS
+            dZ1 = Rc2 * np.cos(teta); dY1 = Rc2 * np.sin(teta)
+            if Y[l] < sol_Y:
+                Yinta = Y[l] + dey1 + dY1;  Zinta = Z[l] - dZ1 + dez1
+            else:
+                Yinta = Y[l] - dey1 + dY1;  Zinta = Z[l] - dZ1 + dez1
+
+            b_ramp_int = Zinta - aramp2 * Yinta
+            Yinta2 = (b_ramp_int - b_surf2) / (coef - aramp2)
+            Zinta2 = aramp2 * Yinta2 + b_ramp_int
+            hyp3   = np.sqrt((Zinta2 - Zinta)**2 + (Yinta2 - Yinta)**2)
+            dist_int = dist + hyp3
+            dist_tot = dist + hyp3 + Rc * (beta - teta)
+
+            if S < dist:
+                if omega < 0:
+                    phi  = S / Rc2
+                    rota = np.arccos((Y[l] - sol_Y) / Rc2)
+                    Y[l] = sol_Y + Rc2 * np.cos(-rota + phi)
+                    Z[l] = sol_Z + Rc2 * np.sin(-rota + phi)
+                else:
+                    phi1 = S / Rc2
+                    Y[l] = Y[l] - dey1 + Rc2 * np.sin(phi1 + phi3)
+                    Z[l] = Z[l] - Rc2 * np.cos(phi1 + phi3) + dez1
+            elif S < dist_int:
+                Y[l] = Yinta + (S - dist) * np.cos(teta)
+                Z[l] = Zinta + (S - dist) * np.sin(teta)
+            elif S < dist_tot:
+                c    = S - dist - hyp3
+                phi4 = c / Rc
+                Y[l] = Yinta2 - Rc*np.sin(teta) + Rc*np.sin(teta + phi4)
+                Z[l] = Zinta2 + Rc*np.cos(teta) - Rc*np.cos(teta + phi4)
+            else:
+                c    = S - dist - hyp3 - Rc * (beta - teta)
+                Y[l] = Yinta2 - Rc*np.sin(teta) + Rc*np.sin(beta) + c*np.cos(beta)
+                Z[l] = Zinta2 + Rc*np.cos(teta) - Rc*np.cos(beta) + c*np.sin(beta)
+
+        # ── Zone 3: between the two hinges ───────────────────────────────
+        elif Z[l] < Asurf2(Y[l]):
+            Hyp = np.hypot(Ypoint[l] - Y[l], Zpoint[l] - Z[l])
+            if S < Hyp:
+                Y[l] += S * np.cos(teta)
+                Z[l] += S * np.sin(teta)
+            elif S < Hyp + Rc * (beta - teta):
+                phi  = (S - Hyp) / Rc
+                Y[l] = Ypoint[l] - deltaY_char2 + np.abs(Rc * np.sin(teta + phi))
+                Z[l] = Zpoint[l] - np.abs(Rc * np.cos(teta + phi)) + deltaZ_char2
+            else:
+                c    = S - Hyp - Rc * (beta - teta)
+                Y[l] = Ypoint2[l] + c * np.cos(beta)
+                Z[l] = Zpoint2[l] + c * np.sin(beta)
+
+        # ── Zone 4: in northern hinge ─────────────────────────────────────
+        elif Z[l] < Asurf1(Y[l]):
+            Zc   = Z[l] - Rc * np.sin(angle)
+            Yc   = Y[l] - Rc * np.cos(angle)
+            idx  = np.argmin(np.abs(Zc - (Yc * abis + bbis)))
+            sol_Y, sol_Z = Yc[idx], Zc[idx]
+            dez  = np.abs(sol_Z - Z[l])
+            dey  = np.abs(sol_Y - Y[l])
+            phi3 = np.arctan2(dey, dez)
+            hypo = Rc * (beta - phi3)
+
+            if S < hypo:
+                phi1 = S / Rc
+                Y[l] = Y[l] - dey + Rc * np.sin(phi1 + phi3)
+                Z[l] = Z[l] - Rc * np.cos(phi1 + phi3) + dez
+            else:
+                Yint = Y[l] - dey + Rc * np.sin(beta)
+                Zint = Z[l] - Rc * np.cos(beta) + dez
+                Y[l] = Yint + (S - hypo) * np.cos(beta)
+                Z[l] = Zint + (S - hypo) * np.sin(beta)
+
+        # ── Zone 5: above northern axial surface ──────────────────────────
+        else:
+            Y[l] += S * np.cos(beta)
+            Z[l] += S * np.sin(beta)
+
+    mask               = Y < Y_faille
+    Y_save             = Y[mask]
+    Z_save             = Z[mask]
+    horizontal_shortening = Y_initial[mask] - Y_save
 
     return {
         # Fault trace
@@ -310,7 +305,7 @@ def compute_fault_and_axial_surfaces(params, Y_insar, Z_insar):
         # InSAR (projected)
         "Y_insar": Y_insar, "Z_insar": Z_insar,
         # Shortening
-        "Smax": Smax, "n_tot": n_tot,
+        "Smax": Smax,
         # Hinge points
         "Ych1": Ych1, "Zch1": Zch1,
         "Ych2": Ych2, "Zch2": Zch2,
@@ -336,7 +331,6 @@ if __name__ == "__main__":
         "Ymax": 29000,
         "W": 5000,        # Width of the first hinge
         "W2": 3000,       # Width of the second hinge
-        "n_tot": 1,
         "di": 4000,
         "Smax": 30,
     }
