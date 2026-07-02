@@ -35,11 +35,11 @@ def compute_fault_and_axial_surfaces(params, Y_insar, Z_insar):
     coef2  = -1 / alpha2
 
     # Fault surface point
-    Y_faille = params["Y_faille"]
-    Z_faille = params["Z_faille"]
+    Y_fault = params["Y_fault"]
+    Z_fault = params["Z_fault"]
 
     # Ramp equations  (y = a*x + b)
-    aramp1 = np.tan(beta);  bramp1 = Z_faille - aramp1 * Y_faille
+    aramp1 = np.tan(beta);  bramp1 = Z_fault - aramp1 * Y_fault
     ramp1  = lambda x: aramp1 * x + bramp1
 
     Y_r2   = params["Y_r2"];  Z_r2 = ramp1(Y_r2)
@@ -97,13 +97,13 @@ def compute_fault_and_axial_surfaces(params, Y_insar, Z_insar):
     # ============================================================================
     # FAULT TRACE  (vectorized)
     # ============================================================================
-    Yfaille = np.arange(Ymin, Ymax + 1, dtype=float)
-    Zfaille = np.where(
-        Yfaille < Ych4, ramp3(Yfaille),
-        np.where((Yfaille < Ych3), Cercle2(Yfaille),
-        np.where((Yfaille < Ych2), ramp2(Yfaille),
-        np.where((Yfaille < Ych1), Cercle(Yfaille),
-                                   ramp1(Yfaille)))))
+    Y_fault_trace = np.arange(Ymin, Ymax + 1, dtype=float)
+    Z_fault_trace = np.where(
+        Y_fault_trace < Ych4, ramp3(Y_fault_trace),
+        np.where((Y_fault_trace < Ych3), Cercle2(Y_fault_trace),
+        np.where((Y_fault_trace < Ych2), ramp2(Y_fault_trace),
+        np.where((Y_fault_trace < Ych1), Cercle(Y_fault_trace),
+                                   ramp1(Y_fault_trace)))))
 
     # ============================================================================
     # AXIAL SURFACES
@@ -118,27 +118,20 @@ def compute_fault_and_axial_surfaces(params, Y_insar, Z_insar):
     Asurf3 = lambda x: coef2 * x + b_surf3   # Southern inner axial surface
     Asurf4 = lambda x: coef2 * x + b_surf4   # Southern axial surface
 
-    def _clip_surface(Z, Y, zmin=-2000, zmax=4000):
-        idx = (Z > zmin) & (Z < zmax)
-        return Y[idx], Z[idx]
-
-    Y_asurf1, Z_asurf1 = _clip_surface(Asurf1(Yfaille), Yfaille)
-    Y_asurf2, Z_asurf2 = _clip_surface(Asurf2(Yfaille), Yfaille)
-    Y_asurf3, Z_asurf3 = _clip_surface(Asurf3(Yfaille), Yfaille)
-    Y_asurf4, Z_asurf4 = _clip_surface(Asurf4(Yfaille), Yfaille)
+    # Evaluate axial surfaces over the full fault-trace domain; the plot axes
+    # limits [Ymin, Ymax] control what is actually visible.
+    Y_asurf1, Z_asurf1 = Y_fault_trace, Asurf1(Y_fault_trace)
+    Y_asurf2, Z_asurf2 = Y_fault_trace, Asurf2(Y_fault_trace)
+    Y_asurf3, Z_asurf3 = Y_fault_trace, Asurf3(Y_fault_trace)
+    Y_asurf4, Z_asurf4 = Y_fault_trace, Asurf4(Y_fault_trace)
 
     # ============================================================================
-    # PROJECT TOPO AND INSAR
-    # ============================================================================
-    Y_insar = np.max(Y_insar) - Y_insar
-
-    # ============================================================================
-    # STRATA DEFORMATION
+    # SURFACE DEFORMATION
     # ============================================================================
     angle = np.linspace(np.pi, 2 * np.pi, 10000)
 
-    G_Y0      = np.linspace(0, 30000, di + 1)
-    G_Z0      = np.full(di + 1, 3307.0)
+    G_Y0      = np.linspace(0, Y_fault, di + 1) # Y initials avant deformation
+    G_Z0      = np.full(di + 1, Z_fault) # z initials avant deformation
     Y_initial = G_Y0.copy()
 
     deltaZ_char2 = Rc * np.cos(teta)
@@ -286,24 +279,22 @@ def compute_fault_and_axial_surfaces(params, Y_insar, Z_insar):
             Y[l] += S * np.cos(beta)
             Z[l] += S * np.sin(beta)
 
-    mask               = Y < Y_faille
-    Y_save             = Y[mask]
-    Z_save             = Z[mask]
-    horizontal_shortening = Y_initial[mask] - Y_save
+    mask               = Y < Y_fault
+    Y_def             = Y[mask]
+    Z_def             = Z[mask]
+    horizontal_def = Y_initial[mask] - Y_def # calcul du racourcissement: Y_apres_def - Y_ini
 
     return {
         # Fault trace
-        "Yfaille": Yfaille, "Zfaille": Zfaille,
+        "Y_fault_trace": Y_fault_trace, "Z_fault_trace": Z_fault_trace,
         # Axial surfaces
         "Y_asurf1": Y_asurf1, "Z_asurf1": Z_asurf1,
         "Y_asurf2": Y_asurf2, "Z_asurf2": Z_asurf2,
         "Y_asurf3": Y_asurf3, "Z_asurf3": Z_asurf3,
         "Y_asurf4": Y_asurf4, "Z_asurf4": Z_asurf4,
         # Deformed strata
-        "Y_save": Y_save, "Z_save": Z_save,
-        "horizontal_shortening": horizontal_shortening,
-        # InSAR (projected)
-        "Y_insar": Y_insar, "Z_insar": Z_insar,
+        "Y_def": Y_def, "Z_def": Z_def,
+        "horizontal_def": horizontal_def,
         # Shortening
         "Smax": Smax,
         # Hinge points
@@ -321,8 +312,8 @@ def compute_fault_and_axial_surfaces(params, Y_insar, Z_insar):
 if __name__ == "__main__":
     params = {
         "beta": 32,       # Steep fault segment
-        "Y_faille": 29862,
-        "Z_faille": 3438,
+        "Y_fault": 29862,
+        "Z_fault": 3438,
         "teta": 31,       # Intermediate segment
         "Y_r2": 26000,
         "omega": 30,      # Shallow segment

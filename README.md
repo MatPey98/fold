@@ -181,7 +181,6 @@ Constraint enforced: β > θ > ω (geometrically required).
 | `Ymin` | Model domain start — also used to filter InSAR data (m) |
 | `Ymax` | Model domain end — also used to filter InSAR data (m) |
 | `di` | Number of material points discretizing the deforming layer |
-| `Z_ref` | Reference elevation of the initial flat strata in `kinematic.py` — used to convert absolute elevations to relative uplift (m) |
 | `nbins` | Number of bins for along-profile InSAR median smoothing |
 
 #### Output

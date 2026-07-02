@@ -101,21 +101,21 @@ except Exception as e:
     z_topo = np.zeros(len(y_topo))
 
 # InSAR — vertical
-insar_data_verti = Insar(insar_vertical, chemin_insar, profile)
+insar_data_verti = Insar(d_vert, chemin_insar, profile)
 abscisses_verti, velocities_verti = insar_data_verti.projection_insar(width)
 abscisses_verti = np.max(abscisses_verti) - abscisses_verti
 mask = (abscisses_verti < Ymax) & (abscisses_verti > Ymin)
 y_insar          = abscisses_verti
 z_insar          = velocities_verti
-y_insar_filtered = abscisses_verti[mask]
+y_vert = abscisses_verti[mask]
 z_insar_filtered = velocities_verti[mask]
 
 # InSAR — horizontal (shortening)
-insar_data_horiz = Insar(insar_horizontal, chemin_insar, profile)
+insar_data_horiz = Insar(d_horz, chemin_insar, profile)
 abscisses_horiz, velocities_horiz = insar_data_horiz.projection_insar(width)
 y_insar_short          = np.max(abscisses_horiz) - abscisses_horiz
 z_insar_short          = velocities_horiz
-y_insar_short_filtered = y_insar_short[mask]
+y_horiz = y_insar_short[mask]
 z_insar_short_filtered = z_insar_short[mask]
 
 # ======================================================================================================================
@@ -170,14 +170,11 @@ else:
 def forward_model(p):
     """Run the forward model with parameter dict p; return (z_vert, z_horiz)."""
     full = dict(p,
-                Y_faille=Y_faille, Z_faille=Z_faille,
+                Y_fault=Y_fault, Z_fault=Z_fault,
                 Ymin=Ymin, Ymax=Ymax, di=di)
     res = compute_fault_and_axial_surfaces(full, y_insar, z_insar)
-    # G_Z0 in kinematic.py is initialised at 3307 m; subtract to get displacement
-    # relative to initial flat layer — matches optimize_kinematic.py line 135
-    z_ref = full.get("Z_ref", 3307.0)
-    z_v = np.interp(y_insar_filtered, res["Y_save"], res["Z_save"] - z_ref)
-    z_h = np.interp(y_insar_filtered, res["Y_save"], res["horizontal_shortening"])
+    z_v = np.interp(y_vert,  res["Y_def"], res["Z_def"] - Z_fault)
+    z_h = np.interp(y_horiz, res["Y_def"], res["horizontal_def"])
     return z_v, z_h, res
 
 # ======================================================================================================================
@@ -189,36 +186,36 @@ n_real  = globals().get('n_samples', 100)
 n_avail = min(len(filtered["beta"]), n_real)
 idx_draw = np.random.choice(len(filtered["beta"]), n_avail, replace=False)
 
-vert_stack  = []
-horiz_stack = []
+f_vertical_stack  = []
+f_horizontal_stack = []
 fault_realizations = []
 
 for i, idx in enumerate(idx_draw):
     p = {name: filtered[name][idx] for name in PARAM_NAMES}
     try:
-        z_v, z_h, res = forward_model(p)
-        vert_stack.append(z_v)
-        horiz_stack.append(z_h)
-        if "Yfaille" in res and "Zfaille" in res:
-            fault_realizations.append((res["Yfaille"], res["Zfaille"]))
+        f_v, f_h, res = forward_model(p)
+        f_vertical_stack.append(f_v)
+        f_horizontal_stack.append(f_h)
+        if "Y_fault_trace" in res and "Z_fault_trace" in res:
+            fault_realizations.append((res["Y_fault_trace"], res["Z_fault_trace"]))
     except Exception as e:
         print(f"  Warning: sample {idx} failed ({e})")
 
-if not vert_stack:
+if not f_vertical_stack:
     print("Error: no valid forward model evaluations")
     sys.exit(1)
 
 # Mean prediction = E[f(θ)] averaged over filtered samples (not f(mean params))
-z_vert_mean  = np.mean(vert_stack,  axis=0)
-z_horiz_mean = np.mean(horiz_stack, axis=0)
+f_vertical_mean  = np.mean(f_vertical_stack,  axis=0)
+f_horizontal_mean = np.mean(f_horizontal_stack, axis=0)
 
 # Constant offset correction: InSAR data has an arbitrary reference (reference pixel).
 # The offset is estimated as the mean residual between data and model predictions,
 # then removed so the comparison is on the same reference.
-offset_vert  = np.nanmean(z_insar_filtered - z_vert_mean)
-offset_horiz = np.nanmean(z_insar_short_filtered - z_horiz_mean)
-z_vert_mean  += offset_vert
-z_horiz_mean += offset_horiz
+offset_vert  = np.nanmean(z_insar_filtered - f_vertical_mean)
+offset_horiz = np.nanmean(z_insar_short_filtered - f_horizontal_mean)
+f_vertical_mean  += offset_vert
+f_horizontal_mean += offset_horiz
 print(f"\nConstant offset applied:")
 print(f"  vertical  : {offset_vert:+.2f} mm")
 print(f"  shortening: {offset_horiz:+.2f} mm")
@@ -260,7 +257,7 @@ ax1.legend(loc="upper left")
 
 ax1b = ax1.twinx()
 ax1b.scatter(y_insar, z_insar, s=2, alpha=0.4, color='tab:blue', label="InSAR vertical")
-ax1b.plot(y_insar_filtered, z_vert_mean, color='tab:red', linewidth=1.5,
+ax1b.plot(y_vert, f_vertical_mean, color='tab:red', linewidth=1.5,
           label=f"Mean model{suffix}")
 ax1b.set_ylabel("Vertical deformation (mm)")
 ax1b.grid(True, linestyle='--', alpha=0.1)
@@ -274,7 +271,7 @@ ax2.legend(loc="upper left")
 ax2b = ax2.twinx()
 ax2b.scatter(y_insar_short, z_insar_short, s=2, alpha=0.4, color='tab:orange',
              label="InSAR shortening")
-ax2b.plot(y_insar_filtered, z_horiz_mean, color='tab:green', linewidth=1.5,
+ax2b.plot(y_horiz, f_horizontal_mean, color='tab:green', linewidth=1.5,
           label=f"Mean model{suffix}")
 ax2b.set_ylabel("Shortening (mm)")
 ax2b.grid(True, linestyle='--', alpha=0.1)
@@ -287,8 +284,8 @@ ax3.set_ylabel("Depth (m)")
 for yf, zf in fault_realizations:
     ax3.plot(yf, zf, 'tab:red', alpha=0.1, linewidth=0.5)
 
-if "Yfaille" in mean_res and "Zfaille" in mean_res:
-    ax3.plot(mean_res["Yfaille"], mean_res["Zfaille"],
+if "Y_fault_trace" in mean_res and "Z_fault_trace" in mean_res:
+    ax3.plot(mean_res["Y_fault_trace"], mean_res["Z_fault_trace"],
              color='tab:red', linewidth=1.5, label=f"Mode fault{suffix}")
 
 for i in range(1, 5):
@@ -306,6 +303,14 @@ for i in range(1, 5):
 ax3.set_title(f"Posterior fault geometry — {n_avail} realizations{suffix}")
 ax3.legend(loc="lower left")
 ax3.grid(True, linestyle='--', alpha=0.3)
+
+# Fix ax3 y-limits: top = topo max + 2 km, bottom = deepest fault point - 2 km
+z3_max = np.nanmax(z_topo) + 2000
+if "Z_fault_trace" in mean_res:
+    z3_min = np.nanmin(mean_res["Z_fault_trace"]) - 2000
+else:
+    z3_min = -2000
+ax3.set_ylim(z3_min, z3_max)
 
 for ax in [ax1, ax2, ax3]:
     ax.set_xlim(min(y_insar), max(y_insar))
