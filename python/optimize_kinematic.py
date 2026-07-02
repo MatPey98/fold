@@ -130,17 +130,27 @@ def forward_model(beta, teta, omega, Y_r2, Y_r3, W, W2, Smax):
         "di": di, "n_tot": n_tot,
     }
 
-    results = compute_fault_and_axial_surfaces(params, y_topo, z_topo, y_insar, z_insar)
+    results = compute_fault_and_axial_surfaces(params, y_insar, z_insar)
 
+    Ych1 = results["Ych1"]
+    Zch1 = results["Zch1"]
     Ych2 = results["Ych2"]
     Ych3 = results["Ych3"]
+
+    # Geometric validity checks:
+    # 1. Hinge ordering (frontal hinge must be ahead of rear hinge)
+    # 2. Fault tip (Ych1) must not exceed the surface trace (Y_faille):
+    #    if W is too large, Ych1 = Y_r2 + hypo*cos(beta) > Y_faille which is
+    #    geometrically impossible (hinge exits above surface)
+    tip_above_surface = Ych1 > Y_faille
+    invalid = (np.any(Ych2 < Ych3) or np.any(np.isnan(Y_r2)) or tip_above_surface)
 
     Z_interp = np.interp(y_insar_filtered, results["Y_save"], results["Z_save"] - Z_ref)
     shortening_interp = np.interp(y_insar_filtered, results["Y_save"], results["horizontal_shortening"])
 
-    if np.any(np.isnan(Z_interp)) or np.any(np.isinf(Z_interp)) or np.any(Ych2 < Ych3) or np.any(np.isnan(Y_r2)):
+    if np.any(np.isnan(Z_interp)) or np.any(np.isinf(Z_interp)) or invalid:
         Z_interp = np.random.normal(0, 1e-3, size=len(Z_interp))
-    if np.any(np.isnan(shortening_interp)) or np.any(np.isinf(shortening_interp)) or np.any(Ych2 < Ych3) or np.any(np.isnan(Y_r2)):
+    if np.any(np.isnan(shortening_interp)) or np.any(np.isinf(shortening_interp)) or invalid:
         shortening_interp = np.random.normal(0, 1e-3, size=len(shortening_interp))
 
     return Z_interp, shortening_interp

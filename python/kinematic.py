@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 
-def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
+def compute_fault_and_axial_surfaces(params, Y_insar, Z_insar):
     """
     Compute fault geometry, axial surfaces and surface deformation
     for a trishear/kink-band kinematic model.
@@ -13,15 +13,13 @@ def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
     ----------
     params : dict
         Model parameters (see input file).
-    Y_topo, Z_topo : array-like
-        Along-profile topography coordinates.
     Y_insar, Z_insar : array-like
         Along-profile InSAR velocities.
 
     Returns
     -------
     dict with fault geometry, axial surfaces, deformed strata, and
-    projected topo/InSAR.
+    projected InSAR.
     """
     # ============================================================================
     # PARAMETERS
@@ -134,7 +132,6 @@ def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
     # PROJECT TOPO AND INSAR
     # ============================================================================
     Y_insar = np.max(Y_insar) - Y_insar
-    Y_topo  = np.max(Y_topo)  - Y_topo
 
     # ============================================================================
     # STRATA DEFORMATION
@@ -310,8 +307,7 @@ def compute_fault_and_axial_surfaces(params, Y_topo, Z_topo, Y_insar, Z_insar):
         # Deformed strata
         "Y_save": Y_save, "Z_save": Z_save,
         "horizontal_shortening": horizontal_shortening,
-        # Topo and InSAR (projected)
-        "Y_topo": Y_topo, "Z_topo": Z_topo,
+        # InSAR (projected)
         "Y_insar": Y_insar, "Z_insar": Z_insar,
         # Shortening
         "Smax": Smax, "n_tot": n_tot,
@@ -346,38 +342,6 @@ if __name__ == "__main__":
     }
 
     results = compute_fault_and_axial_surfaces(params,
-                  Y_topo=np.linspace(6000, 29000, 1000),
-                  Z_topo=np.linspace(1800, 3438, 1000),
                   Y_insar=np.linspace(6000, 29000, 500),
                   Z_insar=np.zeros(500))
 
-    fig = plt.figure(layout="constrained", figsize=(8, 8))
-    gs  = gridspec.GridSpec(2, 1, height_ratios=[1, 2])
-    ax1 = fig.add_subplot(gs[0])
-    ax2 = fig.add_subplot(gs[1])
-    ax1b = ax1.twinx()
-
-    ax1.plot(results["Y_topo"], results["Z_topo"], color='black', linewidth=1)
-    ax1b.plot(results["Y_insar"], results["Z_insar"], linewidth=1, alpha=0.7, label="InSAR")
-    ax1b.plot(results["Y_save"], results["Z_save"] - 3307, '-b', label='Computed deformation')
-    ax1b.set_ylabel("Velocity", color='r')
-
-    ax2.plot(results["Y_topo"], results["Z_topo"], color="black")
-    ax2.set_xlabel('Horizontal distance (m)')
-    ax2.set_ylabel('Depth (m)')
-    ax2.plot(results["Yfaille"],  results["Zfaille"],  '-r',  label='Fault')
-    ax2.plot(results["Y_asurf1"], results["Z_asurf1"], '-k',  label='Axial surface 1')
-    ax2.plot(results["Y_asurf2"], results["Z_asurf2"], '-k',  label='Axial surface 2')
-    ax2.plot(results["Y_asurf3"], results["Z_asurf3"], '-k',  label='Axial surface 3')
-    ax2.plot(results["Y_asurf4"], results["Z_asurf4"], '-k',  label='Axial surface 4')
-    ax2.scatter(results["Ych1"], results["Zch1"], color='green',  s=50, label='Hinge 1')
-    ax2.scatter(results["Ych2"], results["Zch2"], color='blue',   s=50, label='Hinge 2')
-    ax2.scatter(results["Ych3"], results["Zch3"], color='orange', s=50, label='Hinge 3')
-    ax2.scatter(results["Ych4"], results["Zch4"], color='purple', s=50, label='Hinge 4')
-    ax2.scatter(results["Ycrois"], results["Zcrois"], color='cyan', s=50, label='ramp1-ramp2 intersection')
-    ax2.plot(results["Y_r2"], results["Z_r2"], 'or', label='R2 point')
-    ax2.plot(results["Y_r3"], results["Z_r3"], 'or', label='R3 point')
-    ax2.legend(loc="upper right")
-    ax2.grid(True)
-    ax2.axis("equal")
-    plt.show()
