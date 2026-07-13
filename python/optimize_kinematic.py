@@ -27,7 +27,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 def usage():
-    print('invert_plan.py infile.py [-h]')
+    print('optimize_kinematic.py infile.py [-h]')
     print('-h Show this screen')
 
 # Load input file
@@ -70,16 +70,49 @@ print(f"Output directory: {output_dir}")
 shutil.copy2(fname, os.path.join(output_dir, path.basename(fname)))
 
 # ======================================================================================================================
+# NUMBER OF SEGMENTS — auto-detected from prior bounds present in the input file
+# ======================================================================================================================
+# 3 segments : UY_r3, Uomega, UW2 all defined  → beta→hinge→teta→hinge→omega
+# 2 segments : Uteta, UY_r2, UW defined         → beta→hinge→teta
+# 1 segment  : only Ubeta (and USmax) defined   → beta only
+if 'n_segments' in globals():
+    n_segments = int(globals()['n_segments'])
+elif all(k in globals() for k in ('UY_r3', 'Uomega', 'UW2')):
+    n_segments = 3
+elif all(k in globals() for k in ('Uteta', 'UY_r2', 'UW')):
+    n_segments = 2
+else:
+    n_segments = 1
+
+print(f"Model: {n_segments}-segment fault-bend fold")
+
+# ── Active parameters and their Uniform priors ────────────────────────────────
+if n_segments == 3:
+    PARAM_NAMES  = ["beta", "teta", "omega", "Y_r2", "Y_r3", "W", "W2", "Smax"]
+    PARAM_PRIORS = {
+        "beta": Ubeta, "teta": Uteta, "omega": Uomega,
+        "Y_r2": UY_r2, "Y_r3": UY_r3, "W": UW, "W2": UW2, "Smax": USmax,
+    }
+elif n_segments == 2:
+    PARAM_NAMES  = ["beta", "teta", "Y_r2", "W", "Smax"]
+    PARAM_PRIORS = {
+        "beta": Ubeta, "teta": Uteta, "Y_r2": UY_r2, "W": UW, "Smax": USmax,
+    }
+else:  # 1 segment
+    PARAM_NAMES  = ["beta", "Smax"]
+    PARAM_PRIORS = {"beta": Ubeta, "Smax": USmax}
+
+# ======================================================================================================================
 # DATA LOADING
 # ======================================================================================================================
 # Profile --------------------------------------------------------------------------------------------------------------
-profile = Profile(coupe, chemin_coupe, width)  # Build profile from endpoints and azimuth
-profile.linspace(n)                            # Discretize into n points along the profile length
+profile = Profile(coupe, chemin_coupe, width)
+profile.linspace(n)
 y_topo = np.max(profile.abscisse) - profile.abscisse
 
 # Topography -----------------------------------------------------------------------------------------------------------
 try:
-    _mnt_err = globals().get('mnt_err', None)  # optional — defaults to None (sigma=1)
+    _mnt_err = globals().get('mnt_err', None)
     topodata = MNT(mnt, _mnt_err, chemin_mnt)
     z_topo = topodata.elevations(profile.points)
 except:
@@ -117,40 +150,32 @@ def data():
 # ======================================================================================================================
 # FORWARD MODEL
 # ======================================================================================================================
-def forward_model(beta, teta, omega, Y_r2, Y_r3, W, W2, Smax):
+def forward_model(param_dict):
     """
-    Compute expected deformation with scalar parameter values.
+    Compute expected deformation from a dict of active parameter values.
+    Fixed parameters (Y_fault, Z_fault, …) are injected here.
     """
-    params = {
-        "beta": beta, "teta": teta, "omega": omega,
-        "Y_r2": Y_r2, "Y_r3": Y_r3,
-        "W": W, "W2": W2, "Smax": Smax,
-        "Y_fault": Y_fault, "Z_fault": Z_fault,
-        "Ymin": Ymin, "Ymax": Ymax,
-        "di": di,
-    }
+    params = dict(param_dict,
+                  Y_fault=Y_fault, Z_fault=Z_fault,
+                  Ymin=Ymin, Ymax=Ymax, di=di,
+                  n_segments=n_segments)
 
     results = compute_fault_and_axial_surfaces(params, y_insar, z_insar)
 
-    Ych1 = results["Ych1"]
-    Zch1 = results["Zch1"]
-    Ych2 = results["Ych2"]
-    Ych3 = results["Ych3"]
-    Ych4 = results["Ych4"]
+    # Geometric validity checks (conditional on n_segments)
+    invalid = False
+    if n_segments >= 2:
+        Ych1 = results["Ych1"]
+        # Hinge 1 base must not exceed the surface fault trace
+        invalid = invalid or bool(Ych1 > Y_fault)
+    if n_segments >= 3:
+        Ych2 = results["Ych2"]
+        Ych3 = results["Ych3"]
+        Ych4 = results["Ych4"]
+        # Hinge ordering + hinge 2 must remain within the model domain
+        invalid = invalid or bool(np.any(Ych2 < Ych3)) or bool(Ych4 < Ymin)
 
-    # Geometric validity checks:
-    # 1. Hinge ordering (frontal hinge must be ahead of rear hinge)
-    # 2. Base of ramp1 (Ych1) must not exceed the surface fault trace (Y_fault):
-    #    if W is too large, Ych1 = Y_r2 + hypo*cos(beta) > Y_fault which is
-    #    geometrically impossible (hinge base beyond surface trace)
-    # 3. Base of ramp2 hinge (Ych4) must remain within the model domain:
-    #    if W2 is too large, Ych4 = Y_r3 - hypo2*cos(omega) < Ymin
-    hinge_beyond_surface   = Ych1 > Y_fault
-    hinge2_outside_domain  = Ych4 < Ymin
-    invalid = (np.any(Ych2 < Ych3) or np.any(np.isnan(Y_r2))
-               or hinge_beyond_surface or hinge2_outside_domain)
-
-    vert_interp          = np.interp(y_vert,  results["Y_def"], results["Z_def"] - Z_fault)
+    vert_interp = np.interp(y_vert,  results["Y_def"], results["Z_def"] - Z_fault)
     horz_interp = np.interp(y_horiz, results["Y_def"], results["horizontal_def"])
 
     if np.any(np.isnan(vert_interp)) or np.any(np.isinf(vert_interp)) or invalid:
@@ -170,10 +195,10 @@ class ForwardModelOp(pytensor.graph.op.Op):
     def perform(self, node, inputs, outputs):
         model = inputs[0]
         try:
-            model_values = [float(val) for val in model]
-            beta, teta, omega, Y_r2, Y_r3, W, W2, Smax = model_values
-            f_vertical, f_horizontal = forward_model(beta, teta, omega, Y_r2, Y_r3, W, W2, Smax)
-            if np.any(np.isnan(f_vertical)) or np.any(np.isinf(f_vertical)) or np.any(np.isnan(f_horizontal)) or np.any(np.isinf(f_horizontal)):
+            param_dict = {name: float(val) for name, val in zip(PARAM_NAMES, model)}
+            f_vertical, f_horizontal = forward_model(param_dict)
+            if (np.any(np.isnan(f_vertical))  or np.any(np.isinf(f_vertical)) or
+                np.any(np.isnan(f_horizontal)) or np.any(np.isinf(f_horizontal))):
                 raise ValueError("forward_model returned NaN or inf values.")
             outputs[0][0] = np.concatenate([f_vertical, f_horizontal])
         except Exception as e:
@@ -185,43 +210,73 @@ forward_op = ForwardModelOp()
 # ======================================================================================================================
 # BAYESIAN INFERENCE
 # ======================================================================================================================
-def run_inversion():
-    with pm.Model() as model:
-        # Prior definitions within the model context
-        beta = pm.Uniform("beta", lower=Ubeta[0], upper=Ubeta[1])
-        teta = pm.Uniform("teta", lower=Uteta[0], upper=Uteta[1])
-        omega = pm.Uniform("omega", lower=Uomega[0], upper=Uomega[1])
-        Y_r2 = pm.Uniform("Y_r2", lower=UY_r2[0], upper=UY_r2[1])
-        Y_r3 = pm.Uniform("Y_r3", lower=UY_r3[0], upper=UY_r3[1])
-        W = pm.Uniform("W", lower=UW[0], upper=UW[1])
-        W2 = pm.Uniform("W2", lower=UW2[0], upper=UW2[1])
-        Smax = pm.Uniform("Smax", lower=USmax[0], upper=USmax[1])
+def _compute_initvals():
+    """
+    Return a parameter dict that satisfies all geometric ordering constraints.
+    Used as starting point for each chain to avoid degenerate initial states
+    (e.g. Y_r2 ≈ Y_r3 or beta < teta) that cause 0% acceptance rate.
+    """
+    iv = {}
+    lo, hi = PARAM_PRIORS["beta"];    iv["beta"] = (lo + hi) / 2
+    lo, hi = PARAM_PRIORS["Smax"];    iv["Smax"] = (lo + hi) / 2
+    if n_segments >= 2:
+        lo, hi = PARAM_PRIORS["teta"]
+        iv["teta"] = min((lo + hi) / 2, iv["beta"] - 5)
+        lo, hi = PARAM_PRIORS["Y_r2"]
+        iv["Y_r2"] = lo + 0.75 * (hi - lo)   # upper quartile of prior
+        lo, hi = PARAM_PRIORS["W"]
+        iv["W"] = (lo + hi) / 2
+    if n_segments >= 3:
+        lo, hi = PARAM_PRIORS["omega"]
+        iv["omega"] = min((lo + hi) / 2, iv["teta"] - 5)
+        lo, hi = PARAM_PRIORS["Y_r3"]
+        iv["Y_r3"] = lo + 0.25 * (hi - lo)   # lower quartile of prior
+        lo, hi = PARAM_PRIORS["W2"]
+        iv["W2"] = (lo + hi) / 2
+        # Enforce Y_r2 > Y_r3 with a safety margin
+        if iv["Y_r2"] <= iv["Y_r3"] + 500:
+            iv["Y_r2"] = iv["Y_r3"] + 2000
+    return iv
 
-        # Stack parameters into model vector
-        model_vec = pt.stack([beta, teta, omega, Y_r2, Y_r3, W, W2, Smax])
+
+def run_inversion():
+    initvals = _compute_initvals()
+    print(f"Initial values: { {k: f'{v:.1f}' for k, v in initvals.items()} }")
+
+    with pm.Model() as model:
+        # Priors — built dynamically from PARAM_PRIORS
+        priors = {name: pm.Uniform(name, lower=lo, upper=hi)
+                  for name, (lo, hi) in PARAM_PRIORS.items()}
+
+        # Stack parameters into model vector (order must match PARAM_NAMES)
+        model_vec = pt.stack([priors[name] for name in PARAM_NAMES])
         mu = forward_op(model_vec)
-        f_vertical  = mu[:len(y_vert)]
+        f_vertical   = mu[:len(y_vert)]
         f_horizontal = mu[len(y_vert):]
         mu = pm.Deterministic("mu", mu)
 
         d_obs_vert, d_obs_horiz = data()
-
         pm.Normal("InSAR_Vertical",   mu=f_vertical,   sigma=sigma_vert,  observed=d_obs_vert)
         pm.Normal("InSAR_Horizontal", mu=f_horizontal, sigma=sigma_horiz, observed=d_obs_horiz)
 
-        # Penalize invalid parameter combinations
-        pm.Potential("invalid_parameters",
-                     pm.math.switch(
-                         (beta < teta) | (teta < omega) | (Y_r2 < Y_r3), -1e6, 0)
-                     )
+        # Geometric ordering constraints (conditional on n_segments)
+        if n_segments == 3:
+            pm.Potential("invalid_parameters",
+                         pm.math.switch(
+                             (priors["beta"]  < priors["teta"])  |
+                             (priors["teta"]  < priors["omega"]) |
+                             (priors["Y_r2"]  < priors["Y_r3"]), -1e6, 0))
+        elif n_segments == 2:
+            pm.Potential("invalid_parameters",
+                         pm.math.switch(priors["beta"] < priors["teta"], -1e6, 0))
 
-        # Bayesian inference sampling
         trace = pm.sample(
             draws=niter,
             tune=nburn,
             chains=chains,
             cores=cores,
-            step=pm.Metropolis(scaling=10),
+            step=pm.Metropolis(),   # no fixed scaling — PyMC auto-tunes per chain
+            initvals=initvals,
             progressbar=True,
         )
     return model, trace
@@ -236,60 +291,52 @@ def plot_results(trace):
     plt.rcParams["figure.dpi"] = 150
     plt.rcParams["savefig.dpi"] = 300
 
-    # Parameter summary
-    var_names = ["beta", "teta", "omega", "Y_r2", "Y_r3", "W", "W2", "Smax"]
-
-    summary = az.summary(trace, var_names=var_names)
+    summary = az.summary(trace, var_names=PARAM_NAMES)
     print("\nPosterior parameter summary:")
     print(summary)
 
     # Trace and posterior plots -----------------------------------------------------------------------------------------
     plt.rcParams.update({'font.size': 6})
     try:
-        az.plot_trace(trace, var_names=var_names, compact=True, figsize=(5, 3), combined=True)
+        az.plot_trace(trace, var_names=PARAM_NAMES, compact=True, figsize=(5, 3), combined=True)
         plt.gcf().savefig(os.path.join(output_dir, 'trace.pdf'), bbox_inches='tight')
 
-        az.plot_posterior(trace, var_names=var_names, kind='hist', textsize=6, figsize=(5, 3))
+        az.plot_posterior(trace, var_names=PARAM_NAMES, kind='hist', textsize=6, figsize=(5, 3))
         plt.gcf().savefig(os.path.join(output_dir, 'posterior.pdf'), bbox_inches='tight')
 
-        az.plot_pair(trace, var_names=var_names, kind='hexbin', marginals=True, textsize=6, figsize=(5, 3))
+        az.plot_pair(trace, var_names=PARAM_NAMES, kind='hexbin', marginals=True, textsize=6, figsize=(5, 3))
         plt.gcf().savefig(os.path.join(output_dir, 'corner.pdf'), bbox_inches='tight')
 
-        az.plot_forest(trace, var_names=["beta", "teta", "omega", "Smax"], combined=True, hdi_prob=0.95, textsize=6,
-                       linewidth=1, markersize=2, figsize=(5, 3))
-        plt.gcf().savefig(os.path.join(output_dir, 'forest_angles.pdf'), bbox_inches='tight')
-
-        az.plot_forest(trace, var_names=["Y_r2", "Y_r3", "W", "W2"], combined=True, hdi_prob=0.95, textsize=6,
-                       linewidth=1, markersize=2, figsize=(5, 3))
-        plt.gcf().savefig(os.path.join(output_dir, 'forest_geometry.pdf'), bbox_inches='tight')
+        angle_params = [p for p in PARAM_NAMES if p in ("beta", "teta", "omega", "Smax")]
+        geom_params  = [p for p in PARAM_NAMES if p in ("Y_r2", "Y_r3", "W", "W2")]
+        if angle_params:
+            az.plot_forest(trace, var_names=angle_params, combined=True, hdi_prob=0.95,
+                           textsize=6, linewidth=1, markersize=2, figsize=(5, 3))
+            plt.gcf().savefig(os.path.join(output_dir, 'forest_angles.pdf'), bbox_inches='tight')
+        if geom_params:
+            az.plot_forest(trace, var_names=geom_params, combined=True, hdi_prob=0.95,
+                           textsize=6, linewidth=1, markersize=2, figsize=(5, 3))
+            plt.gcf().savefig(os.path.join(output_dir, 'forest_geometry.pdf'), bbox_inches='tight')
     except Exception as e:
         print(f"Warning: arviz plotting failed ({e})")
 
     # Model figure formatting ------------------------------------------------------------------------------------------
     plt.rcParams.update({
-        "figure.figsize": (6, 4),
-        "figure.dpi": 150,
-        "savefig.dpi": 300,
-        "font.size": 8,
-        "axes.titlesize": 9,
-        "axes.labelsize": 8,
-        "legend.fontsize": 7,
-        "lines.linewidth": 1.2,
-        "axes.linewidth": 0.8,
-        "xtick.major.size": 3,
-        "ytick.major.size": 3,
-        "grid.linestyle": "--",
-        "grid.alpha": 0.1
+        "figure.figsize": (6, 4), "figure.dpi": 150, "savefig.dpi": 300,
+        "font.size": 8, "axes.titlesize": 9, "axes.labelsize": 8,
+        "legend.fontsize": 7, "lines.linewidth": 1.2,
+        "axes.linewidth": 0.8, "xtick.major.size": 3, "ytick.major.size": 3,
+        "grid.linestyle": "--", "grid.alpha": 0.1
     })
 
-    # Results: vertical and horizontal displacements
-    mu_all = trace.posterior["mu"].mean(dim=["chain", "draw"]).values
-    f_vertical  = mu_all[:len(y_vert)]
+    # Posterior mean prediction
+    mu_all       = trace.posterior["mu"].mean(dim=["chain", "draw"]).values
+    f_vertical   = mu_all[:len(y_vert)]
     f_horizontal = mu_all[len(y_vert):]
 
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
 
-    # Panel 1: InSAR data vs model predictions -------------------------------------------------------------------------
+    # Panel 1: vertical ------------------------------------------------------------------------------------------------
     ax1.set_title("InSAR data vs model predictions")
     ax1.plot(y_topo, z_topo, 'k-', linewidth=1, label="Topography")
     ax1.set_ylabel("Elevation (m)")
@@ -302,7 +349,7 @@ def plot_results(trace):
     ax1b.grid(True, linestyle='--', alpha=0.1)
     ax1b.legend(loc="upper right")
 
-    # Panel 2: Horizontal (shortening) --------------------------------------------------------------------------------
+    # Panel 2: horizontal (shortening) --------------------------------------------------------------------------------
     ax2.plot(y_topo, z_topo, 'k-', linewidth=1, label="Topography")
     ax2.set_ylabel("Elevation (m)")
     ax2.legend(loc="upper left")
@@ -314,116 +361,69 @@ def plot_results(trace):
     ax2b.set_ylabel("Shortening (mm)")
     ax2b.legend(loc="upper right")
 
-    # Panel 3: Posterior fault geometry --------------------------------------------------------------------------------
+    # Panel 3: posterior fault geometry --------------------------------------------------------------------------------
     ax3.plot(y_topo, z_topo, 'k-', label='Topography')
     ax3.set_ylabel("Depth (m)")
 
-    # Extract posterior samples
-    beta_samples  = trace.posterior["beta"].values.flatten()
-    teta_samples  = trace.posterior["teta"].values.flatten()
-    omega_samples = trace.posterior["omega"].values.flatten()
-    Y_r2_samples  = trace.posterior["Y_r2"].values.flatten()
-    Y_r3_samples  = trace.posterior["Y_r3"].values.flatten()
-    W_samples     = trace.posterior["W"].values.flatten()
-    W2_samples    = trace.posterior["W2"].values.flatten()
-    Smax_samples  = trace.posterior["Smax"].values.flatten()
-
-    # Filter NaN values
-    valid_indices = (
-        ~np.isnan(beta_samples)  & ~np.isnan(teta_samples)  & ~np.isnan(omega_samples) &
-        ~np.isnan(Y_r2_samples)  & ~np.isnan(Y_r3_samples)  &
-        ~np.isnan(W_samples)     & ~np.isnan(W2_samples)     & ~np.isnan(Smax_samples)
-    )
-
-    beta_samples  = beta_samples[valid_indices]
-    teta_samples  = teta_samples[valid_indices]
-    omega_samples = omega_samples[valid_indices]
-    Y_r2_samples  = Y_r2_samples[valid_indices]
-    Y_r3_samples  = Y_r3_samples[valid_indices]
-    W_samples     = W_samples[valid_indices]
-    W2_samples    = W2_samples[valid_indices]
-    Smax_samples  = Smax_samples[valid_indices]
+    # Extract and filter posterior samples
+    samples = {name: trace.posterior[name].values.flatten() for name in PARAM_NAMES}
+    valid   = np.ones(len(samples[PARAM_NAMES[0]]), dtype=bool)
+    for name in PARAM_NAMES:
+        valid &= ~np.isnan(samples[name])
+    for name in PARAM_NAMES:
+        samples[name] = samples[name][valid]
 
     # Draw random posterior realizations
-    if len(beta_samples) > 0:
-        num_samples = min(n_samples, len(beta_samples))
-        sample_indices = np.random.choice(len(beta_samples), num_samples, replace=False)
+    if len(samples[PARAM_NAMES[0]]) > 0:
+        num_samples  = min(n_samples, len(samples[PARAM_NAMES[0]]))
+        sample_idxs  = np.random.choice(len(samples[PARAM_NAMES[0]]), num_samples, replace=False)
 
-        for idx in sample_indices:
-            params_sample = {
-                "beta": beta_samples[idx], "teta": teta_samples[idx],
-                "omega": omega_samples[idx],
-                "Y_r2": Y_r2_samples[idx], "Y_r3": Y_r3_samples[idx],
-                "W": W_samples[idx], "W2": W2_samples[idx],
-                "Smax": Smax_samples[idx],
-                "Y_fault": Y_fault, "Z_fault": Z_fault,
-                "Ymin": Ymin, "Ymax": Ymax,
-                "di": di,
-            }
-
+        for idx in sample_idxs:
+            param_dict = {name: samples[name][idx] for name in PARAM_NAMES}
+            kin_params = dict(param_dict, Y_fault=Y_fault, Z_fault=Z_fault,
+                              Ymin=Ymin, Ymax=Ymax, di=di, n_segments=n_segments)
             try:
-                sample_results = compute_fault_and_axial_surfaces(params_sample, y_insar, z_insar)
-                if "Y_fault_trace" in sample_results and "Z_fault_trace" in sample_results:
-                    ax3.plot(sample_results["Y_fault_trace"], sample_results["Z_fault_trace"], 'tab:red', alpha=0.1, linewidth=0.5)
+                res = compute_fault_and_axial_surfaces(kin_params, y_insar, z_insar)
+                if "Y_fault_trace" in res:
+                    ax3.plot(res["Y_fault_trace"], res["Z_fault_trace"],
+                             'tab:red', alpha=0.1, linewidth=0.5)
             except Exception as e:
                 print(f"Error computing fault for sample {idx}: {e}")
 
     # Mean fault
-    beta_mean  = np.nanmean(beta_samples)
-    teta_mean  = np.nanmean(teta_samples)
-    omega_mean = np.nanmean(omega_samples)
-    Y_r2_mean  = np.nanmean(Y_r2_samples)
-    Y_r3_mean  = np.nanmean(Y_r3_samples)
-    W_mean     = np.nanmean(W_samples)
-    W2_mean    = np.nanmean(W2_samples)
-    Smax_mean  = np.nanmean(Smax_samples)
-
-    params_mean = {
-        "beta": beta_mean, "teta": teta_mean, "omega": omega_mean,
-        "Y_r2": Y_r2_mean, "Y_r3": Y_r3_mean,
-        "W": W_mean, "W2": W2_mean, "Smax": Smax_mean,
-        "Y_fault": Y_fault, "Z_fault": Z_fault,
-        "Ymin": Ymin, "Ymax": Ymax,
-        "di": di,
-    }
-
+    mean_param_dict = {name: np.nanmean(samples[name]) for name in PARAM_NAMES}
+    mean_kin_params = dict(mean_param_dict, Y_fault=Y_fault, Z_fault=Z_fault,
+                           Ymin=Ymin, Ymax=Ymax, di=di, n_segments=n_segments)
     try:
-        mean_results = compute_fault_and_axial_surfaces(params_mean, y_insar, z_insar)
+        mean_results = compute_fault_and_axial_surfaces(mean_kin_params, y_insar, z_insar)
 
-        if "Y_fault_trace" in mean_results and "Z_fault_trace" in mean_results:
-            ax3.plot(mean_results["Y_fault_trace"], mean_results["Z_fault_trace"], color='tab:red', linewidth=1.5,
-                     label="Mean fault")
+        ax3.plot(mean_results["Y_fault_trace"], mean_results["Z_fault_trace"],
+                 color='tab:red', linewidth=1.5, label="Mean fault")
 
-        # Mean axial surfaces (4 surfaces indexed 1–4)
         for i in range(1, 5):
-            y_key = f"Y_asurf{i}"
-            z_key = f"Z_asurf{i}"
-            if y_key in mean_results and z_key in mean_results:
-                ax3.plot(mean_results[y_key], mean_results[z_key], 'k--', alpha=0.5, linewidth=0.8,
+            if f"Y_asurf{i}" in mean_results:
+                ax3.plot(mean_results[f"Y_asurf{i}"], mean_results[f"Z_asurf{i}"],
+                         'k--', alpha=0.5, linewidth=0.8,
                          label="Axial surfaces" if i == 1 else "")
 
-        # Mean hinges (4 hinges indexed 1–4)
         for i in range(1, 5):
-            y_key = f"Ych{i}"
-            z_key = f"Zch{i}"
-            if y_key in mean_results and z_key in mean_results:
-                ax3.scatter(mean_results[y_key], mean_results[z_key], color='tab:red', s=20,
-                            label="Hinges" if i == 1 else "", alpha=0.5)
+            if f"Ych{i}" in mean_results:
+                ax3.scatter(mean_results[f"Ych{i}"], mean_results[f"Zch{i}"],
+                            color='tab:red', s=20, alpha=0.5,
+                            label="Hinges" if i == 1 else "")
+
+        # Fix ax3 y-limits: top = topo max + 2 km, bottom = deepest fault - 2 km
+        z3_max = np.nanmax(z_topo) + 2000
+        z3_min = np.nanmin(mean_results["Z_fault_trace"]) - 2000
+        ax3.set_ylim(z3_min, z3_max)
+
     except Exception as e:
         print(f"Error computing mean fault: {e}")
 
     ax3.legend(loc="lower left")
     realisations = cores * (nburn + niter)
-    ax3.set_title(f"Posterior fault representation with {realisations} realizations")
+    ax3.set_title(f"Posterior fault geometry — {n_segments} segments, {realisations} iterations")
     ax3.grid(True, linestyle='--', alpha=0.5)
-
-    # Fix ax3 y-limits: top = topo max + 2 km, bottom = deepest fault point - 2 km
-    z3_max = np.nanmax(z_topo) + 1000
-    if "Z_fault_trace" in mean_results:
-        z3_min = np.nanmin(mean_results["Z_fault_trace"]) - 2000
-    else:
-        z3_min = -2000
-    ax3.set_ylim(z3_min, z3_max)
 
     for ax in [ax1, ax2, ax3]:
         ax.set_xlim(min(y_insar), max(y_insar))
@@ -444,17 +444,15 @@ def save_traces(trace):
     concatenated (flattened), one value per line.
     Also saves lp.txt (log-posterior) so plot_model_fit can find the MAP sample.
     """
-    var_names = ["beta", "teta", "omega", "Y_r2", "Y_r3", "W", "W2", "Smax"]
     traces_dir = os.path.join(output_dir, 'traces')
     os.makedirs(traces_dir, exist_ok=True)
-    for var in var_names:
+    for var in PARAM_NAMES:
         samples = trace.posterior[var].values.flatten()
-        fname = os.path.join(traces_dir, f'{var}.txt')
+        fname   = os.path.join(traces_dir, f'{var}.txt')
         np.savetxt(fname, samples, fmt='%.6f')
         print(f"  Saved {var:8s} → {fname}")
-    # Save log-likelihood (used as lp proxy for MAP identification).
-    # Metropolis does not store lp in sample_stats; compute from the mu Deterministic
-    # already saved in the posterior (Gaussian likelihood, sigma_vert=10, sigma_horiz=50).
+
+    # Save log-likelihood as lp proxy (MAP identification in plot_model_fit)
     try:
         mu_samples = trace.posterior["mu"].values          # (chains, draws, n_obs)
         n_vert = len(y_vert)

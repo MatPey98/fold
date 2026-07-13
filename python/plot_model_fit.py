@@ -81,6 +81,27 @@ except Exception:
         sys.exit(1)
 
 # ======================================================================================================================
+# NUMBER OF SEGMENTS — same auto-detection as optimize_kinematic.py
+# ======================================================================================================================
+if 'n_segments' in globals():
+    n_segments = int(globals()['n_segments'])
+elif all(k in globals() for k in ('UY_r3', 'Uomega', 'UW2')):
+    n_segments = 3
+elif all(k in globals() for k in ('Uteta', 'UY_r2', 'UW')):
+    n_segments = 2
+else:
+    n_segments = 1
+
+print(f"Model: {n_segments}-segment fault-bend fold")
+
+if n_segments == 3:
+    PARAM_NAMES = ["beta", "teta", "omega", "Y_r2", "Y_r3", "W", "W2", "Smax"]
+elif n_segments == 2:
+    PARAM_NAMES = ["beta", "teta", "Y_r2", "W", "Smax"]
+else:
+    PARAM_NAMES = ["beta", "Smax"]
+
+# ======================================================================================================================
 # Load data (same as optimize_kinematic.py)
 # ======================================================================================================================
 
@@ -122,8 +143,6 @@ z_insar_short_filtered = z_insar_short[mask]
 # Load and filter traces
 # ======================================================================================================================
 
-PARAM_NAMES = ["beta", "teta", "omega", "Y_r2", "Y_r3", "W", "W2", "Smax"]
-
 raw = {}
 for name in PARAM_NAMES:
     fpath = os.path.join(traces_dir, f'{name}.txt')
@@ -132,8 +151,7 @@ for name in PARAM_NAMES:
         sys.exit(1)
     raw[name] = np.loadtxt(fpath)
 
-# Apply joint mode filter: keep sample i only if ALL parameters fall within
-# their respective primary KDE peak window. This preserves parameter correlations.
+# Apply joint mode filter
 suffix = " (mode-filtered)" if filter_mode else ""
 
 n_total = len(raw[PARAM_NAMES[0]])
@@ -151,13 +169,11 @@ if filter_mode:
 else:
     mask_joint = None
 
-# Mode (KDE peak) of each parameter marginal — always computed on full posterior
 modes = {name: primary_mode_window(raw[name])[0] for name in PARAM_NAMES}
 print(f"\nParameter modes{suffix}:")
 for name, val in modes.items():
     print(f"  {name:6s} = {val:.4g}")
 
-# filtered: samples used for realizations envelope
 if mask_joint is not None:
     filtered = {name: raw[name][mask_joint] for name in PARAM_NAMES}
 else:
@@ -168,25 +184,25 @@ else:
 # ======================================================================================================================
 
 def forward_model(p):
-    """Run the forward model with parameter dict p; return (z_vert, z_horiz)."""
+    """Run the forward model with parameter dict p; return (z_vert, z_horiz, res)."""
     full = dict(p,
                 Y_fault=Y_fault, Z_fault=Z_fault,
-                Ymin=Ymin, Ymax=Ymax, di=di)
+                Ymin=Ymin, Ymax=Ymax, di=di,
+                n_segments=n_segments)
     res = compute_fault_and_axial_surfaces(full, y_insar, z_insar)
     z_v = np.interp(y_vert,  res["Y_def"], res["Z_def"] - Z_fault)
     z_h = np.interp(y_horiz, res["Y_def"], res["horizontal_def"])
     return z_v, z_h, res
 
 # ======================================================================================================================
-# Draw posterior realizations from filtered samples and average predictions
-# E[f(θ)] rather than f(E[θ]) — correct for nonlinear models
+# Draw posterior realizations and average predictions
 # ======================================================================================================================
 
-n_real  = globals().get('n_samples', 100)
-n_avail = min(len(filtered["beta"]), n_real)
-idx_draw = np.random.choice(len(filtered["beta"]), n_avail, replace=False)
+n_real   = globals().get('n_samples', 100)
+n_avail  = min(len(filtered[PARAM_NAMES[0]]), n_real)
+idx_draw = np.random.choice(len(filtered[PARAM_NAMES[0]]), n_avail, replace=False)
 
-f_vertical_stack  = []
+f_vertical_stack   = []
 f_horizontal_stack = []
 fault_realizations = []
 
@@ -205,25 +221,19 @@ if not f_vertical_stack:
     print("Error: no valid forward model evaluations")
     sys.exit(1)
 
-# Mean prediction = E[f(θ)] averaged over filtered samples (not f(mean params))
-f_vertical_mean  = np.mean(f_vertical_stack,  axis=0)
+f_vertical_mean   = np.mean(f_vertical_stack,  axis=0)
 f_horizontal_mean = np.mean(f_horizontal_stack, axis=0)
 
-# Constant offset correction: InSAR data has an arbitrary reference (reference pixel).
-# The offset is estimated as the mean residual between data and model predictions,
-# then removed so the comparison is on the same reference.
+# Constant offset correction
 offset_vert  = np.nanmean(z_insar_filtered - f_vertical_mean)
 offset_horiz = np.nanmean(z_insar_short_filtered - f_horizontal_mean)
-f_vertical_mean  += offset_vert
+f_vertical_mean   += offset_vert
 f_horizontal_mean += offset_horiz
 print(f"\nConstant offset applied:")
 print(f"  vertical  : {offset_vert:+.2f} mm")
 print(f"  shortening: {offset_horiz:+.2f} mm")
 
-# Representative geometry:
-#   1. MAP sample (highest log-posterior) if lp.txt exists — always a valid joint sample
-#   2. Joint-filtered median if filter worked
-#   3. Full-posterior median otherwise
+# Representative geometry: MAP (lp.txt) or full-posterior median
 lp_file = os.path.join(traces_dir, 'lp.txt')
 if os.path.isfile(lp_file):
     lp = np.loadtxt(lp_file)
@@ -300,7 +310,7 @@ for i in range(1, 5):
                     color='tab:red', s=20, alpha=0.5,
                     label="Hinges" if i == 1 else "")
 
-ax3.set_title(f"Posterior fault geometry — {n_avail} realizations{suffix}")
+ax3.set_title(f"Posterior fault geometry — {n_segments} segments, {n_avail} realizations{suffix}")
 ax3.legend(loc="lower left")
 ax3.grid(True, linestyle='--', alpha=0.3)
 
