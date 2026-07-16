@@ -37,7 +37,7 @@ Y_faille = 24800   # Surface trace of the fault — along-profile position (m)
 Z_faille = 3430    # Surface trace of the fault — elevation (m)
 Ymin     = 5000    # Fault computation start position (m)
 Ymax     = 24800   # Fault computation end position (m)
-di       = 4000    # Layer thickness (m)
+di       = 4000    # Number of Y-grid steps (di+1 material points along profile)
 n_tot    = 1       # Total number of models
 Z_ref    = 3307.0  # Reference elevation of initial flat strata in kinematic.py (G_Z0)
 

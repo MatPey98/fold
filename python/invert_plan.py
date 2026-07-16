@@ -59,6 +59,8 @@ if len(sys.argv) > 1:
 def _load_insar(filename, chemin, profile, width, nbins=120):
     """
     Load an InSAR raster, project onto the profile, and compute binned statistics.
+    Abscisses are reversed using profile.l so that InSAR data is aligned with
+    the topography (which uses np.max(profile.abscisse) = profile.l as origin).
 
     Returns
     -------
@@ -70,36 +72,44 @@ def _load_insar(filename, chemin, profile, width, nbins=120):
         if len(abscisses) == 0:
             print(f"Warning: No projected InSAR data for {filename}")
             return None
-        abscisses = np.max(abscisses) - abscisses
+        # Use profile.l (full shapefile length) as the reversal origin so that
+        # InSAR data is co-registered with the topography profile.
+        abscisses = profile.l - abscisses
         centers, median, std = data.insar_statistics(width, nbins=nbins)
-        centers = np.max(centers) - centers
+        centers = profile.l - centers
         return abscisses, velocities, centers, median, std
     except Exception as e:
         print(f"Warning: Could not load InSAR data ({filename}): {e}")
         return None
 
 # ======================================================================================================================
-# Profile
+# Profile — length is determined by the shapefile (coupe12.shp)
 # ======================================================================================================================
 profile   = Profile(coupe, chemin_coupe, width)
 profile.linspace(n)
-abscisses = np.max(profile.abscisse) - profile.abscisse
-xmin, xmax = abscisses[0], abscisses[-1]
+abscisses = profile.l - profile.abscisse   # reversed: 0 = far end, profile.l = start
+xmin, xmax = abscisses[0], abscisses[-1]  # xmin = profile.l, xmax = 0
 
 # ======================================================================================================================
 # InSAR — load datasets defined in the input file
 #
-# Input file must define a list of (filename, label) tuples, e.g.:
-#   insar = [
-#       ("vertical_2003-2019.tif",   "vertical 2003–2019"),
-#       ("shortening_2003-2019.tif", "shortening 2003–2019"),
-#   ]
+# Two supported formats:
+#   1. Unified list:
+#        insar = [("vert.tif", "vertical 2003-2019"), ("short.tif", "shortening")]
+#   2. Separate vertical / shortening lists:
+#        insar_verticals   = [("vert.tif",  "2003-2019")]
+#        insar_shortenings = [("short.tif", "2003-2019")]
+# All files are loaded from chemin_insar.
 # ======================================================================================================================
 
 _COLORS = ["dodgerblue", "coral", "darkseagreen", "mediumpurple", "goldenrod", "teal"]
 _nbins  = globals().get('nbins', 120)
 
 _insar_list = globals().get('insar', [])
+if not _insar_list:
+    # Support separate vertical / shortening lists
+    _insar_list = (globals().get('insar_verticals',   []) +
+                   globals().get('insar_shortenings', []))
 
 insar_results = [(r, label) for (fname, label) in _insar_list
                  for r in [_load_insar(fname, chemin_insar, profile, width, _nbins)]]
@@ -276,8 +286,18 @@ if abs_seismic is not None and len(abs_seismic) > 0:
 
 ax2.legend(loc="upper right")
 ax2.grid(True)
-ax2.axis("equal")
-ax2.set_xlim(xmin, xmax)
+
+# ======================================================================================================================
+# Force shared x limits and equal-scale cross-section
+# ======================================================================================================================
+# Shared x range across all panels
+for _ax in [ax1, ax1b, ax2]:
+    _ax.set_xlim(xmin, xmax)
+
+# Cross-section at scale: 1 m horizontal = 1 m vertical.
+# adjustable='box' keeps the data limits (xlim/ylim) fixed and resizes the
+# axes box instead — so the x range stays consistent with ax1.
+ax2.set_aspect('equal', adjustable='box')
 
 # ======================================================================================================================
 # Save and display

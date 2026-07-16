@@ -180,7 +180,7 @@ Constraint enforced: β > θ > ω (geometrically required).
 | `Z_faille` | Elevation of the surface fault trace (m) |
 | `Ymin` | Model domain start — also used to filter InSAR data (m) |
 | `Ymax` | Model domain end — also used to filter InSAR data (m) |
-| `di` | Number of material points discretizing the deforming layer |
+| `di` | Number of Y-grid steps (material points = di+1) along the profile |
 | `nbins` | Number of bins for along-profile InSAR median smoothing |
 
 #### Output
