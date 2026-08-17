@@ -305,8 +305,9 @@ def plot_results(trace):
     plt.rcParams["figure.dpi"] = 150
     plt.rcParams["savefig.dpi"] = 300
 
-    summary = az.summary(trace, var_names=PARAM_NAMES)
-    print("\nPosterior parameter summary:")
+    all_vars = PARAM_NAMES + ["c_vert", "c_horiz"]
+    summary = az.summary(trace, var_names=all_vars)
+    print("\nPosterior parameter summary (including offsets):")
     print(summary)
 
     # Trace and posterior plots -----------------------------------------------------------------------------------------
@@ -321,8 +322,9 @@ def plot_results(trace):
         az.plot_pair(trace, var_names=PARAM_NAMES, kind='hexbin', marginals=True, textsize=6, figsize=(5, 3))
         plt.gcf().savefig(os.path.join(output_dir, 'corner.pdf'), bbox_inches='tight')
 
-        angle_params = [p for p in PARAM_NAMES if p in ("beta", "teta", "omega", "S")]
-        geom_params  = [p for p in PARAM_NAMES if p in ("Y_r2", "Y_r3", "W", "W2")]
+        angle_params  = [p for p in PARAM_NAMES if p in ("beta", "teta", "omega", "S")]
+        geom_params   = [p for p in PARAM_NAMES if p in ("Y_r2", "Y_r3", "W", "W2")]
+        offset_params = ["c_vert", "c_horiz"]
         if angle_params:
             az.plot_forest(trace, var_names=angle_params, combined=True, hdi_prob=0.95,
                            textsize=6, linewidth=1, markersize=2, figsize=(5, 3))
@@ -331,6 +333,9 @@ def plot_results(trace):
             az.plot_forest(trace, var_names=geom_params, combined=True, hdi_prob=0.95,
                            textsize=6, linewidth=1, markersize=2, figsize=(5, 3))
             plt.gcf().savefig(os.path.join(output_dir, 'forest_geometry.pdf'), bbox_inches='tight')
+        az.plot_forest(trace, var_names=offset_params, combined=True, hdi_prob=0.95,
+                       textsize=6, linewidth=1, markersize=2, figsize=(5, 2))
+        plt.gcf().savefig(os.path.join(output_dir, 'forest_offsets.pdf'), bbox_inches='tight')
     except Exception as e:
         print(f"Warning: arviz plotting failed ({e})")
 

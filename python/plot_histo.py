@@ -135,19 +135,22 @@ def plot_histo(samples, label, ax, hdi_prob=0.95, bins=30, color='steelblue',
 # ======================================================================================================================
 
 PARAMS = [
-    ("beta",  "β — Ramp 1 dip",           "°"),
-    ("teta",  "θ — Ramp 2 dip",           "°"),
-    ("omega", "ω — Ramp 3 dip",           "°"),
-    ("Y_r2",  "Y_r2 — Ramp 1→2 position", "m"),
-    ("Y_r3",  "Y_r3 — Ramp 2→3 position", "m"),
-    ("W",     "W — Upper hinge width",    "m"),
-    ("W2",    "W2 — Lower hinge width",   "m"),
-    ("S",  "S — Shortening",    "mm/yr"),
+    ("beta",    "β — Ramp 1 dip",           "°"),
+    ("teta",    "θ — Ramp 2 dip",           "°"),
+    ("omega",   "ω — Ramp 3 dip",           "°"),
+    ("Y_r2",    "Y_r2 — Ramp 1→2 position", "m"),
+    ("Y_r3",    "Y_r3 — Ramp 2→3 position", "m"),
+    ("W",       "W — Upper hinge width",    "m"),
+    ("W2",      "W2 — Lower hinge width",   "m"),
+    ("S",       "S — Shortening",           "mm/yr"),
+    ("c_vert",  "c_vert — Vertical offset",  "mm"),
+    ("c_horiz", "c_horiz — Horiz. offset",   "mm"),
 ]
 
 COLORS = [
     "steelblue", "darkorange", "seagreen", "mediumpurple",
     "crimson",   "teal",       "goldenrod", "slategray",
+    "deepskyblue", "coral",
 ]
 
 
