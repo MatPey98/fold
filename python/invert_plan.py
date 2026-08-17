@@ -180,11 +180,11 @@ except Exception as e:
 abs_seismic = prof_seismic = mag = rms_values = times_seismic = None
 try:
     seismic_data = Seismic(seismic, chemin_seismic, profile)
-    abs_seismic, prof_seismic, mag, rms_values, times_seismic = \
+    abs_seismic, prof_seismic, mag, z_errors_seismic, times_seismic = \
         seismic_data.projection_seismic(width_seismic)
     if len(abs_seismic) == 0:
         raise ValueError("no seismic events projected onto profile")
-    abs_seismic = np.max(abs_seismic) - abs_seismic
+    abs_seismic = profile.l - np.array(abs_seismic)
 except Exception as e:
     print(f"Warning: No seismic data ({e})")
 
@@ -254,9 +254,13 @@ if dip_fault is not None and elevations is not None:
 # Seismic catalogue
 if abs_seismic is not None and len(abs_seismic) > 0:
     mag      = np.array(mag)
-    rms_vals = np.array(rms_values)    # metres
+    zerr_m   = np.array(z_errors_seismic, dtype=float)   # depth error (m)
     times_yr = np.array(times_seismic) # decimal years
-    depths_m = -np.array(prof_seismic) * 1000 + 4000
+    # Depths in catalogue are in km below the Earth's surface.
+    # Convert to elevation (m) using mean surface elevation as reference:
+    #   elev = mean_surface_elev - depth_km × 1000
+    _mean_surf = float(np.nanmean(elevations)) if elevations is not None else 4000.
+    depths_m = -np.array(prof_seismic) * 1000 + _mean_surf
 
     # Point size proportional to magnitude (area ∝ M)
     mag_min, mag_max = mag.min(), mag.max()
@@ -268,9 +272,9 @@ if abs_seismic is not None and len(abs_seismic) > 0:
                       edgecolor="k", linewidths=0.4,
                       s=sizes, zorder=3)
 
-    # Error bars = RMS location uncertainty
+    # Vertical error bars: depthError from catalogue (m), default = 5 km
     ax2.errorbar(abs_seismic, depths_m,
-                 xerr=rms_vals, yerr=rms_vals,
+                 yerr=zerr_m,
                  fmt='none', ecolor='gray', alpha=0.5, capsize=2, zorder=2)
 
     cax  = inset_axes(ax2, width="3%", height="30%", loc="lower left", borderpad=1)
@@ -288,7 +292,7 @@ ax2.legend(loc="upper right")
 ax2.grid(True)
 
 # ======================================================================================================================
-# Force shared x limits and equal-scale cross-section
+# Force shared x limits, max depth, and equal-scale cross-section
 # ======================================================================================================================
 # Shared x range across all panels
 for _ax in [ax1, ax1b, ax2]:
@@ -298,6 +302,14 @@ for _ax in [ax1, ax1b, ax2]:
 # adjustable='box' keeps the data limits (xlim/ylim) fixed and resizes the
 # axes box instead — so the x range stays consistent with ax1.
 ax2.set_aspect('equal', adjustable='box')
+
+# Y limits for cross-section (metres, sea-level reference) — set AFTER
+# set_aspect so constrained layout does not override them at draw time.
+# max_depth_km : deepest level shown (default 20 km)
+# max_top_m    : shallowest level shown (default +5000 m)
+_max_depth_km = globals().get('max_depth_km', 20)
+_max_top_m    = globals().get('max_top_m', 5000)
+ax2.set_ylim(bottom=-_max_depth_km * 1000, top=_max_top_m)
 
 # ======================================================================================================================
 # Save and display

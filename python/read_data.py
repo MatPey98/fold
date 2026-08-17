@@ -175,7 +175,7 @@ class Seismic:
         self.data["longitude"] = east
         self.data["latitude"] = north
 
-    def projection_seismic(self, width_seismic):
+    def projection_seismic(self, width_seismic, default_depth_error_km=2.0):
         """Project seismic catalogue onto profile.
 
         Returns
@@ -186,18 +186,22 @@ class Seismic:
             Hypocentral depths (km).
         magnitudes : list of float
             Moment magnitudes.
-        rms_list : list of float
-            Location RMS converted to metres (rms_km × 1000).
+        z_errors : list of float
+            Depth uncertainty in metres, from 'depthError' column (km × 1000).
+            Falls back to default_depth_error_km × 1000 when not available.
         times : list of float
             Decimal years (e.g. 2008.5) for colormap scaling.
         """
         # Parse time column — handles USGS, Sun2012 and Zha2013 formats
         decimal_years = np.array([_parse_seismic_time(t) for t in self.data["time"]])
 
+        has_z_err = "depthError" in self.data.columns
+        default_z_m = default_depth_error_km * 1000.
+
         abscisses  = []
         depths     = []
         magnitudes = []
-        rms_list   = []
+        z_errors   = []
         times      = []
 
         for i in range(len(self.data)):
@@ -208,8 +212,8 @@ class Seismic:
                 abscisses.append(xpp)
                 depths.append(self.data["depth"][i])
                 magnitudes.append(self.data["mag"][i])
-                rms_raw = self.data["rms"][i]
-                rms_list.append(float(rms_raw) * 1000 if pd.notna(rms_raw) else 1000.)
+                z_raw = self.data["depthError"][i] if has_z_err else np.nan
+                z_errors.append(float(z_raw) * 1000 if pd.notna(z_raw) else default_z_m)
                 times.append(decimal_years[i])
 
-        return abscisses, depths, magnitudes, rms_list, times
+        return abscisses, depths, magnitudes, z_errors, times

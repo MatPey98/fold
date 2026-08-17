@@ -74,7 +74,7 @@ shutil.copy2(fname, os.path.join(output_dir, path.basename(fname)))
 # ======================================================================================================================
 # 3 segments : UY_r3, Uomega, UW2 all defined  → beta→hinge→teta→hinge→omega
 # 2 segments : Uteta, UY_r2, UW defined         → beta→hinge→teta
-# 1 segment  : only Ubeta (and USmax) defined   → beta only
+# 1 segment  : only Ubeta (and US) defined       → beta only
 if 'n_segments' in globals():
     n_segments = int(globals()['n_segments'])
 elif all(k in globals() for k in ('UY_r3', 'Uomega', 'UW2')):
@@ -88,19 +88,19 @@ print(f"Model: {n_segments}-segment fault-bend fold")
 
 # ── Active parameters and their Uniform priors ────────────────────────────────
 if n_segments == 3:
-    PARAM_NAMES  = ["beta", "teta", "omega", "Y_r2", "Y_r3", "W", "W2", "Smax"]
+    PARAM_NAMES  = ["beta", "teta", "omega", "Y_r2", "Y_r3", "W", "W2", "S"]
     PARAM_PRIORS = {
         "beta": Ubeta, "teta": Uteta, "omega": Uomega,
-        "Y_r2": UY_r2, "Y_r3": UY_r3, "W": UW, "W2": UW2, "Smax": USmax,
+        "Y_r2": UY_r2, "Y_r3": UY_r3, "W": UW, "W2": UW2, "S": US,
     }
 elif n_segments == 2:
-    PARAM_NAMES  = ["beta", "teta", "Y_r2", "W", "Smax"]
+    PARAM_NAMES  = ["beta", "teta", "Y_r2", "W", "S"]
     PARAM_PRIORS = {
-        "beta": Ubeta, "teta": Uteta, "Y_r2": UY_r2, "W": UW, "Smax": USmax,
+        "beta": Ubeta, "teta": Uteta, "Y_r2": UY_r2, "W": UW, "S": US,
     }
 else:  # 1 segment
-    PARAM_NAMES  = ["beta", "Smax"]
-    PARAM_PRIORS = {"beta": Ubeta, "Smax": USmax}
+    PARAM_NAMES  = ["beta", "S"]
+    PARAM_PRIORS = {"beta": Ubeta, "S": US}
 
 # ======================================================================================================================
 # DATA LOADING
@@ -166,13 +166,20 @@ def forward_model(param_dict):
     invalid = False
     if n_segments >= 2:
         Ych1 = results["Ych1"]
-        # Hinge 1 base must not exceed the surface fault trace
-        invalid = invalid or bool(Ych1 > Y_fault)
+        # After applying slip S along ramp beta, the fault tip moves to
+        # Y_fault + S*cos(beta). Hinge 1 must not exceed that position.
+        beta_rad  = np.deg2rad(param_dict["beta"])
+        fault_tip = Y_fault + param_dict["S"] * np.cos(beta_rad)
+        invalid = invalid or bool(Ych1 > fault_tip)
+    if n_segments == 2:
+        Ych2 = results["Ych2"]
+        # Hinge 2 must remain within the model domain
+        invalid = invalid or bool(np.any(Ych2 < Ymin))
     if n_segments >= 3:
         Ych2 = results["Ych2"]
         Ych3 = results["Ych3"]
         Ych4 = results["Ych4"]
-        # Hinge ordering + hinge 2 must remain within the model domain
+        # Hinge ordering + hinge 4 must remain within the model domain
         invalid = invalid or bool(np.any(Ych2 < Ych3)) or bool(Ych4 < Ymin)
 
     vert_interp = np.interp(y_vert,  results["Y_def"], results["Z_def"] - Z_fault)
@@ -218,7 +225,7 @@ def _compute_initvals():
     """
     iv = {}
     lo, hi = PARAM_PRIORS["beta"];    iv["beta"] = (lo + hi) / 2
-    lo, hi = PARAM_PRIORS["Smax"];    iv["Smax"] = (lo + hi) / 2
+    lo, hi = PARAM_PRIORS["S"];        iv["S"] = (lo + hi) / 2
     if n_segments >= 2:
         lo, hi = PARAM_PRIORS["teta"]
         iv["teta"] = min((lo + hi) / 2, iv["beta"] - 5)
@@ -307,7 +314,7 @@ def plot_results(trace):
         az.plot_pair(trace, var_names=PARAM_NAMES, kind='hexbin', marginals=True, textsize=6, figsize=(5, 3))
         plt.gcf().savefig(os.path.join(output_dir, 'corner.pdf'), bbox_inches='tight')
 
-        angle_params = [p for p in PARAM_NAMES if p in ("beta", "teta", "omega", "Smax")]
+        angle_params = [p for p in PARAM_NAMES if p in ("beta", "teta", "omega", "S")]
         geom_params  = [p for p in PARAM_NAMES if p in ("Y_r2", "Y_r3", "W", "W2")]
         if angle_params:
             az.plot_forest(trace, var_names=angle_params, combined=True, hdi_prob=0.95,

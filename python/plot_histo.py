@@ -142,7 +142,7 @@ PARAMS = [
     ("Y_r3",  "Y_r3 — Ramp 2→3 position", "m"),
     ("W",     "W — Upper hinge width",    "m"),
     ("W2",    "W2 — Lower hinge width",   "m"),
-    ("Smax",  "Smax — Shortening",    "mm/yr"),
+    ("S",  "S — Shortening",    "mm/yr"),
 ]
 
 COLORS = [

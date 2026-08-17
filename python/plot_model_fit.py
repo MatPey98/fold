@@ -95,11 +95,11 @@ else:
 print(f"Model: {n_segments}-segment fault-bend fold")
 
 if n_segments == 3:
-    PARAM_NAMES = ["beta", "teta", "omega", "Y_r2", "Y_r3", "W", "W2", "Smax"]
+    PARAM_NAMES = ["beta", "teta", "omega", "Y_r2", "Y_r3", "W", "W2", "S"]
 elif n_segments == 2:
-    PARAM_NAMES = ["beta", "teta", "Y_r2", "W", "Smax"]
+    PARAM_NAMES = ["beta", "teta", "Y_r2", "W", "S"]
 else:
-    PARAM_NAMES = ["beta", "Smax"]
+    PARAM_NAMES = ["beta", "S"]
 
 # ======================================================================================================================
 # Load data (same as optimize_kinematic.py)

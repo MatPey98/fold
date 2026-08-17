@@ -38,9 +38,9 @@ def compute_fault_and_axial_surfaces(params, Y_insar, Z_insar):
     Z_fault = params["Z_fault"]
     Ymin    = params["Ymin"]
     Ymax    = params["Ymax"]
-    Smax    = params["Smax"]
+    S       = params["S"]
     di      = params.get("di", 500)
-    deltaS  = Smax
+    deltaS  = S
 
     # Ramp 1 (always)
     aramp1 = np.tan(beta);  bramp1 = Z_fault - aramp1 * Y_fault
@@ -353,7 +353,7 @@ def compute_fault_and_axial_surfaces(params, Y_insar, Z_insar):
         "Y_def":          Y_def,
         "Z_def":          Z_def,
         "horizontal_def": horizontal_def,
-        "Smax":           Smax,
+        "S":              S,
     }
 
     if n_segs >= 2:
@@ -387,7 +387,7 @@ if __name__ == "__main__":
         "Y_r2": 26000, "Y_r3": 13000,
         "Ymin": 6000, "Ymax": 29000,
         "W": 5000, "W2": 3000,
-        "di": 4000, "Smax": 30,
+        "di": 4000, "S": 30,
     }
 
     # 2-segment example
@@ -398,7 +398,7 @@ if __name__ == "__main__":
         "Y_r2": 20000,
         "Ymin": 5000, "Ymax": 24800,
         "W": 4000,
-        "di": 4000, "Smax": 100,
+        "di": 4000, "S": 100,
     }
 
     for p in [params3, params2]:

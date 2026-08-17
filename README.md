@@ -168,9 +168,16 @@ python ./fold/python/optimize_kinematic.py ./work/fold/input_optimize_kinematic.
 | `UY_r3` | Along-profile position of ramp 2→3 transition (m) |
 | `UW` | Width of the upper hinge (m) |
 | `UW2` | Width of the lower hinge (m) |
-| `USmax` | Maximum shortening Smax (mm/yr) |
+| `US` | Slip S along the fault (mm) |
 
-Constraint enforced: β > θ > ω (geometrically required).
+**Geometric constraints enforced** (models violating any of these are rejected):
+
+- β > θ > ω (angle ordering, 3-segment)
+- β > θ (angle ordering, 2-segment)
+- Y_r2 > Y_r3 (ramp position ordering, 3-segment)
+- Ych1 ≤ Y_fault + S·cos(β) (hinge 1 must not exceed the fault tip after slip)
+- Ych2 ≥ Ymin (hinge 2 within model domain, 2-segment)
+- Ych4 ≥ Ymin (hinge 4 within model domain, 3-segment)
 
 #### Fixed parameters
 
@@ -224,7 +231,7 @@ All figures are saved as PDF to `output_dir` (configurable in the input file).
 | `trace.pdf` | MCMC chain evolution per parameter |
 | `posterior.pdf` | Posterior histograms |
 | `corner.pdf` | Pairwise parameter correlations (hexbin) |
-| `forest_angles.pdf` | 95% HDI intervals for β, θ, ω, Smax |
+| `forest_angles.pdf` | 95% HDI intervals for β, θ, ω, S |
 | `forest_geometry.pdf` | 95% HDI intervals for Y_r2, Y_r3, W, W2 |
 | `model_fit.pdf` | Predicted vs. observed displacement profiles + posterior fault geometry |
 | `traces/<param>.txt` | Raw posterior samples per parameter (all chains concatenated, one value per line) |
