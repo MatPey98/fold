@@ -144,8 +144,13 @@ z_insar_short_filtered = z_insar_short[mask]
 # ======================================================================================================================
 
 raw = {}
+_ALIASES = {"S": "Smax"}   # backward compat: old runs used Smax instead of S
 for name in PARAM_NAMES:
     fpath = os.path.join(traces_dir, f'{name}.txt')
+    if not os.path.isfile(fpath) and name in _ALIASES:
+        fpath = os.path.join(traces_dir, f'{_ALIASES[name]}.txt')
+        if os.path.isfile(fpath):
+            print(f"  Note: using legacy trace '{_ALIASES[name]}.txt' for parameter '{name}'")
     if not os.path.isfile(fpath):
         print(f"Error: trace file not found: {fpath}")
         sys.exit(1)

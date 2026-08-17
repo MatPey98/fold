@@ -170,9 +170,14 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
 
     # ── load all traces ──────────────────────────────────────────────────────
+    _ALIASES = {"S": "Smax"}   # backward compat: old runs used Smax instead of S
     loaded = {}
     for stem, label, unit in PARAMS:
         fpath = os.path.join(traces_dir, f'{stem}.txt')
+        if not os.path.isfile(fpath) and stem in _ALIASES:
+            fpath = os.path.join(traces_dir, f'{_ALIASES[stem]}.txt')
+            if os.path.isfile(fpath):
+                print(f"  Note: using legacy trace '{_ALIASES[stem]}.txt' for parameter '{stem}'")
         if os.path.isfile(fpath):
             loaded[stem] = (np.loadtxt(fpath), label, unit)
         else:
