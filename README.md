@@ -169,6 +169,8 @@ python ./fold/python/optimize_kinematic.py ./work/fold/input_optimize_kinematic.
 | `UW` | Width of the upper hinge (m) |
 | `UW2` | Width of the lower hinge (m) |
 | `US` | Slip S along the fault (mm) |
+| `sigma_c_vert` | σ of the Normal prior on the vertical InSAR reference-level offset (mm; default: 30) |
+| `sigma_c_horiz` | σ of the Normal prior on the horizontal InSAR reference-level offset (mm; default: 30) |
 
 **Geometric constraints enforced** (models violating any of these are rejected):
 
@@ -235,6 +237,8 @@ All figures are saved as PDF to `output_dir` (configurable in the input file).
 | `forest_geometry.pdf` | 95% HDI intervals for Y_r2, Y_r3, W, W2 |
 | `model_fit.pdf` | Predicted vs. observed displacement profiles + posterior fault geometry |
 | `traces/<param>.txt` | Raw posterior samples per parameter (all chains concatenated, one value per line) |
+| `traces/c_vert.txt` | Posterior samples for the vertical InSAR reference-level offset (mm) |
+| `traces/c_horiz.txt` | Posterior samples for the horizontal InSAR reference-level offset (mm) |
 
 ---
 

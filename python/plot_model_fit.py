@@ -184,12 +184,34 @@ if mask_joint is not None:
 else:
     filtered = {name: raw[name] for name in PARAM_NAMES}
 
+# ── Load InSAR offset traces (c_vert, c_horiz) ───────────────────────────────
+# These are saved by optimize_kinematic when run with the offset parameters.
+# Fall back to zeros for old trace sets that pre-date this feature.
+def _load_offset_trace(varname):
+    fpath = os.path.join(traces_dir, f'{varname}.txt')
+    if os.path.isfile(fpath):
+        arr = np.loadtxt(fpath)
+        print(f"  Loaded {varname} offset trace ({len(arr)} samples)")
+        return arr
+    print(f"  Note: {varname}.txt not found — using 0 (old trace set)")
+    return np.zeros(n_total)
+
+raw_c_vert  = _load_offset_trace("c_vert")
+raw_c_horiz = _load_offset_trace("c_horiz")
+
+if mask_joint is not None:
+    filtered_c_vert  = raw_c_vert[mask_joint]
+    filtered_c_horiz = raw_c_horiz[mask_joint]
+else:
+    filtered_c_vert  = raw_c_vert
+    filtered_c_horiz = raw_c_horiz
+
 # ======================================================================================================================
 # Forward model helpers
 # ======================================================================================================================
 
 def forward_model(p):
-    """Run the forward model with parameter dict p; return (z_vert, z_horiz, res)."""
+    """Run the kinematic forward model (no offset); return (z_vert, z_horiz, res)."""
     full = dict(p,
                 Y_fault=Y_fault, Z_fault=Z_fault,
                 Ymin=Ymin, Ymax=Ymax, di=di,
@@ -212,11 +234,13 @@ f_horizontal_stack = []
 fault_realizations = []
 
 for i, idx in enumerate(idx_draw):
-    p = {name: filtered[name][idx] for name in PARAM_NAMES}
+    p    = {name: filtered[name][idx] for name in PARAM_NAMES}
+    c_v  = float(filtered_c_vert[idx])
+    c_h  = float(filtered_c_horiz[idx])
     try:
         f_v, f_h, res = forward_model(p)
-        f_vertical_stack.append(f_v)
-        f_horizontal_stack.append(f_h)
+        f_vertical_stack.append(f_v + c_v)
+        f_horizontal_stack.append(f_h + c_h)
         if "Y_fault_trace" in res and "Z_fault_trace" in res:
             fault_realizations.append((res["Y_fault_trace"], res["Z_fault_trace"]))
     except Exception as e:
@@ -228,15 +252,8 @@ if not f_vertical_stack:
 
 f_vertical_mean   = np.mean(f_vertical_stack,  axis=0)
 f_horizontal_mean = np.mean(f_horizontal_stack, axis=0)
-
-# Constant offset correction
-offset_vert  = np.nanmean(z_insar_filtered - f_vertical_mean)
-offset_horiz = np.nanmean(z_insar_short_filtered - f_horizontal_mean)
-f_vertical_mean   += offset_vert
-f_horizontal_mean += offset_horiz
-print(f"\nConstant offset applied:")
-print(f"  vertical  : {offset_vert:+.2f} mm")
-print(f"  shortening: {offset_horiz:+.2f} mm")
+# Note: no post-hoc offset correction — the optimised c_vert/c_horiz are
+# already included sample-by-sample above.
 
 # Representative geometry: MAP (lp.txt) or full-posterior median
 lp_file = os.path.join(traces_dir, 'lp.txt')

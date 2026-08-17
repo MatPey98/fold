@@ -251,16 +251,23 @@ def run_inversion():
     print(f"Initial values: { {k: f'{v:.1f}' for k, v in initvals.items()} }")
 
     with pm.Model() as model:
-        # Priors — built dynamically from PARAM_PRIORS
+        # Kinematic priors — built dynamically from PARAM_PRIORS
         priors = {name: pm.Uniform(name, lower=lo, upper=hi)
                   for name, (lo, hi) in PARAM_PRIORS.items()}
 
-        # Stack parameters into model vector (order must match PARAM_NAMES)
+        # InSAR reference-level offsets — InSAR data has an arbitrary constant;
+        # without these parameters S would absorb both shape and absolute level.
+        _sigma_c_vert  = float(globals().get('sigma_c_vert',  30))
+        _sigma_c_horiz = float(globals().get('sigma_c_horiz', 30))
+        c_vert  = pm.Normal("c_vert",  mu=0, sigma=_sigma_c_vert)
+        c_horiz = pm.Normal("c_horiz", mu=0, sigma=_sigma_c_horiz)
+
+        # Stack kinematic parameters into model vector (order must match PARAM_NAMES)
         model_vec = pt.stack([priors[name] for name in PARAM_NAMES])
-        mu = forward_op(model_vec)
-        f_vertical   = mu[:len(y_vert)]
-        f_horizontal = mu[len(y_vert):]
-        mu = pm.Deterministic("mu", mu)
+        mu_kin = forward_op(model_vec)
+        f_vertical   = mu_kin[:len(y_vert)]  + c_vert
+        f_horizontal = mu_kin[len(y_vert):]  + c_horiz
+        mu = pm.Deterministic("mu", pt.concatenate([f_vertical, f_horizontal]))
 
         d_obs_vert, d_obs_horiz = data()
         pm.Normal("InSAR_Vertical",   mu=f_vertical,   sigma=sigma_vert,  observed=d_obs_vert)
@@ -453,7 +460,7 @@ def save_traces(trace):
     """
     traces_dir = os.path.join(output_dir, 'traces')
     os.makedirs(traces_dir, exist_ok=True)
-    for var in PARAM_NAMES:
+    for var in PARAM_NAMES + ["c_vert", "c_horiz"]:
         samples = trace.posterior[var].values.flatten()
         fname   = os.path.join(traces_dir, f'{var}.txt')
         np.savetxt(fname, samples, fmt='%.6f')

@@ -36,6 +36,8 @@ US  = [0, 200]        # Uniform prior on slip S (mm)
 Uomega = [0, 90]          # Uniform prior on omega parameter
 UY_r3  = [5000, 24000]    # Uniform prior on ramp position Y_r3 (m)
 UW2    = [0, 10000]     # Uniform prior on second fault width W2 (m)
+sigma_c_vert  = 30        # Normal prior σ on vertical InSAR reference offset (mm)
+sigma_c_horiz = 30        # Normal prior σ on horizontal InSAR reference offset (mm)
 
 output_dir = wdir + 'fold/output_6000iter_3seg/'
 
