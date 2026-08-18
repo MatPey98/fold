@@ -307,6 +307,7 @@ ax2b.plot(y_horiz, f_horizontal_mean, color='tab:green', linewidth=1.5,
           label=f"Mean model{suffix}")
 ax2b.set_ylabel("Shortening (mm)")
 ax2b.grid(True, linestyle='--', alpha=0.1)
+
 ax2b.legend(loc="upper right")
 
 # ── Panel 3: fault geometry ──────────────────────────────────────────────────
@@ -329,8 +330,19 @@ for i in range(1, 5):
 for i in range(1, 5):
     if f"Ych{i}" in mean_res:
         ax3.scatter(mean_res[f"Ych{i}"], mean_res[f"Zch{i}"],
-                    color='tab:red', s=20, alpha=0.5,
+                    color='tab:red', s=25, zorder=6,
+                    edgecolors='black', linewidths=0.5,
                     label="Hinges" if i == 1 else "")
+
+# ── Ramp-transition points (Y_r2, Y_r3) on geometry panel ───────────────────
+if "Y_fault_trace" in mean_res and "Z_fault_trace" in mean_res:
+    _yft = mean_res["Y_fault_trace"]
+    _zft = mean_res["Z_fault_trace"]
+    for _name, _color in [("Y_r2", "black"), ("Y_r3", "black")]:
+        if n_segments >= (2 if _name == "Y_r2" else 3) and _name in mean_params:
+            _yr  = float(mean_params[_name])
+            _zr  = float(np.interp(_yr, _yft, _zft))
+            ax3.scatter(_yr, _zr, color=_color, s=20, zorder=5, label=_name)
 
 ax3.set_title(f"Posterior fault geometry — {n_segments} segments, {n_avail} realizations{suffix}")
 ax3.legend(loc="lower left")
