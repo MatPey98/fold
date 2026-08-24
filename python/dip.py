@@ -27,9 +27,11 @@ class Dip:
         items = os.listdir(self.wdir)
         self.items = [item for item in items if item.endswith(".shp")]
 
-    def load_points(self, filename, mnt):
+    def load_points(self, filename, mnt, profile=None):
         """
         Loads points from a shapefile and retrieves their elevations from a DEM.
+        If profile is provided, only points within profile.w (half-width) of the
+        profile are kept.
 
         Parameters
         ----------
@@ -37,19 +39,35 @@ class Dip:
             Shapefile name (inside wdir).
         mnt : MNT
             DEM object used to query elevation and elevation error.
+        profile : Profile, optional
+            If given, filters points by perpendicular distance to the profile.
         """
         file = geopandas.read_file(self.wdir + filename)
 
         points = []
         sigma  = []
 
-        for pt in file.geometry:
-            x, y = pt.x, pt.y
+        for geom in file.geometry:
+            # Handle both Point and MultiPoint geometries
+            from shapely.geometry import MultiPoint, Point
+            if isinstance(geom, MultiPoint):
+                pts = list(geom.geoms)
+            elif isinstance(geom, Point):
+                pts = [geom]
+            else:
+                pts = list(geom.geoms) if hasattr(geom, 'geoms') else [geom]
 
-            z   = mnt.elevations([[x, y]])[0]
-            err = mnt.elevations_err([[x, y]])[0]
-            points.append([x, y, z])
-            sigma.append(err)
+            for pt in pts:
+                x, y = pt.x, pt.y
+                # Per-point distance filter
+                if profile is not None:
+                    _, ypp = profile.get_projection_all([x, y])
+                    if abs(ypp) > profile.w:
+                        continue
+                z   = mnt.elevations([[x, y]])[0]
+                err = mnt.elevations_err([[x, y]])[0]
+                points.append([x, y, z])
+                sigma.append(err)
 
         self.points = points
         self.sigma  = sigma
@@ -182,7 +200,9 @@ class Dip:
         """
         Sets self.x, self.y to the median coordinates of the loaded points.
         """
-        pts = np.array(self.points)
+        if not self.points:
+            raise ValueError("No points loaded — check shapefile geometry type.")
+        pts = np.atleast_2d(np.array(self.points))
         self.x = np.median(pts[:, 0])
         self.y = np.median(pts[:, 1])
 
@@ -218,20 +238,17 @@ class Dip:
         Common logic for plotting mean dip + Monte Carlo uncertainty for all
         shapefiles in wdir. Used by plot_all_strata and plot_all_fault.
 
-        Only shapefiles whose median point lies within profile.w/2 of the
-        profile (perpendicular distance) are processed.
+        Only points within profile.w (half-width) of the profile are kept.
+        Shapefiles with no remaining points are skipped.
         """
         for filename in self.items:
             # --- Mean dip ---
             print(f"\n── {filename}")
-            self.load_points(filename, topodata)
-            self.compute_median_point()
-
-            # Width filter: skip if median point is too far from the profile
-            _, ypp = profile.get_projection_all([self.x, self.y])
-            if abs(ypp) > profile.w / 2:
-                print(f"  → skipped (perpendicular distance {abs(ypp):.0f} m > {profile.w/2:.0f} m)")
+            self.load_points(filename, topodata, profile=profile)
+            if not self.points:
+                print(f"  → skipped (no points within {profile.w:.0f} m of profile)")
                 continue
+            self.compute_median_point()
             coefficients, sigmam = self.fit_plane()
             a, b, c = coefficients
 

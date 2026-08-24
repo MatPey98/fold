@@ -92,7 +92,7 @@ class Profile:
         self.xpp = dx * self.s[0] + dy * self.s[1] # dans l'allongement du profil
         self.ypp = dx * self.n[0] + dy * self.n[1] # Perpendiculaire au profil
 
-        if self.xpp > self.l or self.xpp < 0 or abs(self.ypp) > width/2:
+        if self.xpp > self.l or self.xpp < 0 or abs(self.ypp) > width:
             return None
         else :
             return self.xpp, self.ypp

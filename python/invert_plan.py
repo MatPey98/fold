@@ -209,8 +209,10 @@ if elev_median is not None:
     ax1.set_ylim(_elev_lo - 200, _elev_hi + 200)
 
 ax1.set_xlim(xmin, xmax)
-ax1.set_xlabel("Distance (m)")
-ax1.set_ylabel("Elevation (m)")
+ax1.set_xlabel("Distance (km)")
+ax1.set_ylabel("Elevation (km)")
+ax1.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x/1e3:.1f}'))
+ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x/1e3:.1f}'))
 ax1.tick_params(axis='y', labelcolor='k')
 
 ax1b = ax1.twinx()
@@ -240,8 +242,10 @@ ax1b.legend(loc="upper right", fontsize=7)
 if elevations is not None:
     ax2.plot(abscisses, elevations, color="black")
 
-ax2.set_xlabel("Horizontal distance (m)")
-ax2.set_ylabel("Depth (m)")
+ax2.set_xlabel("Horizontal distance (km)")
+ax2.set_ylabel("Elevation (km)")
+ax2.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x/1e3:.1f}'))
+ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x/1e3:.1f}'))
 
 # Strata dip measurements
 if dip is not None and elevations is not None:
@@ -298,25 +302,47 @@ ax2.grid(True)
 for _ax in [ax1, ax1b, ax2]:
     _ax.set_xlim(xmin, xmax)
 
-# Cross-section at scale: 1 m horizontal = 1 m vertical.
-# adjustable='box' keeps the data limits (xlim/ylim) fixed and resizes the
-# axes box instead — so the x range stays consistent with ax1.
-ax2.set_aspect('equal', adjustable='box')
+# Y limits for cross-section.
+# bottom_km : lower y-axis limit in km  (e.g. -2 → 2 km below sea level)
+# top_km    : upper y-axis limit in km  (e.g.  4 → 4 km above sea level)
+_profile_len_km = (xmax - xmin) / 1000.
 
-# Y limits for cross-section (metres, sea-level reference) — set AFTER
-# set_aspect so constrained layout does not override them at draw time.
-# max_depth_km : deepest level shown (default 20 km)
-# max_top_m    : shallowest level shown (default +5000 m)
-_max_depth_km = globals().get('max_depth_km', 20)
-_max_top_m    = globals().get('max_top_m', 5000)
-ax2.set_ylim(bottom=-_max_depth_km * 1000, top=_max_top_m)
+_topo_top_km = (float(np.nanmax(elevations)) / 1000. + 1.) if elevations is not None else 5.
+if 'bottom_km' in globals():
+    _bottom_km = float(globals()['bottom_km'])
+else:
+    _bottom_km = -1.   # default
+
+if 'top_km' in globals():
+    _top_km = float(globals()['top_km'])
+else:
+    _top_km = _topo_top_km
+
+ax2.set_ylim(bottom=_bottom_km * 1000, top=_top_km * 1000)
+
+# Cross-section at scale: resize the figure height so the lower panel
+# fits at 1 m horizontal = 1 m vertical (equal aspect).
+_x_range = xmax - xmin                                       # m
+_y_range = (_top_km - _bottom_km) * 1000                    # m
+_fig_w   = fig.get_size_inches()[0]                      # inches
+# ax2 occupies 2/3 of figure height (height_ratios=[1,2]).
+# Required figure height so ax2 box has equal aspect:
+_ax2_w_frac = 0.85   # approximate axes width fraction of figure width
+_ax2_h_frac = 2 / 3  # from height_ratios=[1,2]
+_required_ax2_h = (_fig_w * _ax2_w_frac) * (_y_range / _x_range)  # inches
+_fig_h = max(6., _required_ax2_h / _ax2_h_frac)
+fig.set_size_inches(_fig_w, _fig_h)
+
+ax2.set_aspect('equal', adjustable='box')
+ax2.set_ylim(bottom=_bottom_km * 1000, top=_top_km * 1000)  # re-apply after set_aspect
 
 # ======================================================================================================================
 # Save and display
 # ======================================================================================================================
 output_dir = globals().get('output_dir', '.')
 os.makedirs(output_dir, exist_ok=True)
-output_path = os.path.join(output_dir, "cross_section.pdf")
+_coupe_name = os.path.splitext(os.path.basename(coupe))[0]
+output_path = os.path.join(output_dir, f"cross_section_{_coupe_name}.pdf")
 fig.savefig(output_path, bbox_inches='tight')
 print(f"Figure saved to: {output_path}")
 
