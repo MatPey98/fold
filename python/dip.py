@@ -208,17 +208,12 @@ class Dip:
 
     def find_intersection(self, profile):
         """
-        Finds the intersection of the plane strike with the cross-section profile line.
+        Places the measured point on the cross-section profile line via a simple
+        perpendicular (orthogonal) projection.
         """
-        if abs(self.dip) < 5:
-            m1 = 1 / np.tan(np.radians(profile.azimuth + 90))
-            m2 = 1 / np.tan(np.radians(profile.azimuth))
-        else:
-            m1 = 1 / np.tan(np.radians(self.azimuth + 90))
-            m2 = 1 / np.tan(np.radians(profile.azimuth))
-
-        x = (m1 * self.x - self.y - m2 * profile.start_point[0] + profile.start_point[1]) / (m1 - m2)
-        y = m1 * (x - self.x) + self.y
+        xpp, _ = profile.get_projection_all([self.x, self.y])
+        x = profile.start_point[0] + xpp * profile.s[0]
+        y = profile.start_point[1] + xpp * profile.s[1]
         self.intersect = [[x, y]]
 
     # =========================================================================
@@ -254,13 +249,10 @@ class Dip:
 
             self.calculate_dip(a, b, -1)
             self.calculate_dip_direction(a, b)
-            true_dip = self.dip          # save true dip before projection
-            self.project_dip(profile)    # modifies self.dip → projected dip
+            self.project_dip(profile)    # modifies self.dip → projected (apparent) dip
             projected_dip = self.dip
             print(f"  pendage apparent = {projected_dip:.1f}°")
-            self.dip = true_dip          # restore true dip for find_intersection branch test
-            self.find_intersection(profile)
-            self.dip = projected_dip     # restore projected dip for plotting
+            self.find_intersection(profile)  # perpendicular projection onto the profile line
 
             proj = profile.get_projection_all(self.intersect[0])
             x    = np.max(profile.abscisse) - proj[0]
@@ -301,21 +293,16 @@ class Dip:
                 elif dip_proj < 0:
                     dip_proj = 180 - dip_proj
 
-                m1    = 1 / np.tan(np.radians(az_i + 90))
-                m2    = 1 / np.tan(np.radians(profile.azimuth))
-                x_int = (m1 * self.x - self.y
-                         - m2 * profile.start_point[0]
-                         + profile.start_point[1]) / (m1 - m2)
-                y_int = m1 * (x_int - self.x) + self.y
-
-                proj_mc = profile.get_projection_all([x_int, y_int])
-                x_mc    = np.max(profile.abscisse) - proj_mc[0]
-                y_mc    = topodata.elevations([[x_int, y_int]])
-
-                if not np.isnan(float(y_mc[0])):
+                # Position: the outcrop's physical location doesn't change between
+                # Monte Carlo draws (only our uncertainty on the fitted plane's
+                # orientation does), so each draw is anchored at the same
+                # perpendicular projection (x, y) as the mean point above — only
+                # the segment's angle (dip_proj) varies, fanning out from a fixed
+                # anchor rather than scattering positions across the profile.
+                if not np.isnan(float(y[0])):
                     dx = length * np.cos(np.radians(dip_proj))
                     dy = length * np.sin(np.radians(dip_proj))
-                    ax.plot([x_mc, x_mc - dx], [y_mc, y_mc + dy],
+                    ax.plot([x, x - dx], [y, y + dy],
                             color=mc_color, alpha=mc_alpha)
 
             dip_mc = np.array(dip_mc)
